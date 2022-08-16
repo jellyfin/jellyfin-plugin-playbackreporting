@@ -11,11 +11,12 @@
 			<textarea id="custom_query_text" style="width: 98%; height:75px">
 SELECT ROWID, * 
 FROM PlaybackActivity 
+ORDER BY rowid DESC 
 LIMIT 10
 			</textarea>
 			<br />
 			<br />
-			<input type='checkbox' id="replace_userid"> Replace UserId with UserName<br />
+			<input type='checkbox' id="replace_userid" checked="checked"> Replace UserId with UserName<br />
 			<br />
 			<button id="run_custom_query">Run</button>
 
