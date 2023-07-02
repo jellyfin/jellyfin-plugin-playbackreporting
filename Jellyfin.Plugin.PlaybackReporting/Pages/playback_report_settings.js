@@ -183,30 +183,26 @@ const getConfigurationPageUrl = (name) => {
             }
 
             function loadBackupDataPicker() {
-                require(['directorybrowser'], function (directoryBrowser) {
-                    var picker = new directoryBrowser();
-                    picker.show({
-                        includeFiles: true,
-                        callback: function (selected) {
-                            picker.close();
-                            loadBackupFile(selected, view);
-                        },
-                        header: "Select backup file to load"
-                    });
+                var picker = new Dashboard.DirectoryBrowser();
+                picker.show({
+                    includeFiles: true,
+                    callback: function (selected) {
+                        picker.close();
+                        loadBackupFile(selected, view);
+                    },
+                    header: "Select backup file to load"
                 });
             }
 
             function setBackupPathPicker() {
-                require(['directorybrowser'], function (directoryBrowser) {
-                    var picker = new directoryBrowser();
-                    picker.show({
-                        includeFiles: false,
-                        callback: function (selected) {
-                            picker.close();
-                            setBackupPathCallBack(selected, view);
-                        },
-                        header: "Select backup path"
-                    });
+                var picker = new Dashboard.DirectoryBrowser()
+                picker.show({
+                    includeFiles: false,
+                    callback: function (selected) {
+                        picker.close();
+                        setBackupPathCallBack(selected, view);
+                    },
+                    header: "Select backup path"
                 });
             }
 
