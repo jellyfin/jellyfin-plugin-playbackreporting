@@ -32,7 +32,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.PlaybackReporting.Api
 {
     [ApiController]
-    [Authorize(Policy = "DefaultAuthorization")]
+    [Authorize]
     [Route("user_usage_stats")]
     [Produces(MediaTypeNames.Application.Json)]
     public class PlaybackReportingActivityController : ControllerBase

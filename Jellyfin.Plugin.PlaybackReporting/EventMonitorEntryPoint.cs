@@ -16,6 +16,7 @@ along with this program. If not, see<http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackReporting.Data;
 using MediaBrowser.Controller;
@@ -28,11 +29,12 @@ using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Serialization;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.PlaybackReporting
 {
-    public class EventMonitorEntryPoint : IServerEntryPoint
+    public class EventMonitorEntryPoint : IHostedService
     {
         private readonly ISessionManager _sessionManager;
         private readonly IServerConfigurationManager _config;
@@ -54,25 +56,6 @@ namespace Jellyfin.Plugin.PlaybackReporting
             _config = config;
             _fileSystem = fileSystem;
             playback_trackers = new Dictionary<string, PlaybackTracker>();
-        }
-
-        public void Dispose()
-        {
-            GC.SuppressFinalize(this);
-        }
-
-        public Task RunAsync()
-        {
-            _logger.LogInformation("EventMonitorEntryPoint Running");
-            var repo = new ActivityRepository(_loggerFactory.CreateLogger<ActivityRepository>(), _config.ApplicationPaths, _fileSystem);
-            repo.Initialize();
-            _repository = repo;
-
-            _sessionManager.PlaybackStart += SessionManager_PlaybackStart;
-            _sessionManager.PlaybackStopped += SessionManager_PlaybackStop;
-            _sessionManager.PlaybackProgress += SessionManager_PlaybackProgress;
-
-            return Task.CompletedTask;
         }
 
         private void SessionManager_PlaybackProgress(object? sender, PlaybackProgressEventArgs e)
@@ -361,6 +344,29 @@ namespace Jellyfin.Plugin.PlaybackReporting
             }
 
             return item_name;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("EventMonitorEntryPoint Running");
+            var repo = new ActivityRepository(_loggerFactory.CreateLogger<ActivityRepository>(), _config.ApplicationPaths, _fileSystem);
+            repo.Initialize();
+            _repository = repo;
+
+            _sessionManager.PlaybackStart += SessionManager_PlaybackStart;
+            _sessionManager.PlaybackStopped += SessionManager_PlaybackStop;
+            _sessionManager.PlaybackProgress += SessionManager_PlaybackProgress;
+
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            _sessionManager.PlaybackStart -= SessionManager_PlaybackStart;
+            _sessionManager.PlaybackStopped -= SessionManager_PlaybackStop;
+            _sessionManager.PlaybackProgress -= SessionManager_PlaybackProgress;
+
+            return Task.CompletedTask;
         }
     }
 }
