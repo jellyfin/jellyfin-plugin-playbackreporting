@@ -100,7 +100,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
                 {
                     events.Add(e);
                 }
-                KeyValuePair<DateTime, ActionType> stop_event = new KeyValuePair<DateTime, ActionType>(DateTime.Now, ActionType.STOP);
+                KeyValuePair<DateTime, ActionType> stop_event = new KeyValuePair<DateTime, ActionType>(LastUpdated, ActionType.STOP);
                 events.Add(stop_event);
             }
             else
