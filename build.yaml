@@ -2,8 +2,8 @@
 name: "Playback Reporting"
 guid: "5c534381-91a3-43cb-907a-35aa02eb9d2c"
 imageUrl: "https://repo.jellyfin.org/releases/plugin/images/jellyfin-plugin-playbackreporting.png"
-version: 14
-targetAbi: "10.9.0.0"
+version: 15
+targetAbi: "10.9.7.0"
 framework: net8.0
 owner: "jellyfin"
 overview: "Collect and show user play statistics"
@@ -13,10 +13,7 @@ artifacts:
   - "Jellyfin.Plugin.PlaybackReporting.dll"
   - "SQLitePCL.pretty.dll"
 changelog: |-
-  - 10.9 (#82) @crobibero
-
-  ### New features and improvements ###
-  - Order default query usefully & checkbox by default (#66) @michaelkrieger
+  - Added horizontal scrolling to all report pages (#85) @meister-eder
 
   ### Bug Fixes ###
-  - Fix DirectoryBrowser (#76) @MBR-0001
+  - Use LastUpdated Time Instead of Current Time for missing Stop event (#87) @speatzle
