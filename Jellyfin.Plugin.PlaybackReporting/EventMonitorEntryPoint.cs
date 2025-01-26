@@ -34,7 +34,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.PlaybackReporting
 {
-    public class EventMonitorEntryPoint : IHostedService
+    public class EventMonitorEntryPoint : IHostedService, IDisposable
     {
         private readonly ISessionManager _sessionManager;
         private readonly IServerConfigurationManager _config;
@@ -367,6 +367,20 @@ namespace Jellyfin.Plugin.PlaybackReporting
             _sessionManager.PlaybackProgress -= SessionManager_PlaybackProgress;
 
             return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+            if (_repository != null)
+            {
+                _repository.Dispose();
+                _repository = null;
+            }
+        }
+
+        ~EventMonitorEntryPoint()
+        {
+            Dispose();
         }
     }
 }
