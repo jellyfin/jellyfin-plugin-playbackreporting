@@ -91,7 +91,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
             {
                 string user_id = (string)user_info["user_id"];
                 Guid user_guid = new Guid(user_id);
-                User user = _userManager.GetUserById(user_guid);
+                User? user = _userManager.GetUserById(user_guid);
                 bool has_image = !(user?.ProfileImage is null);
                 string user_name = user?.Username ?? "Not Known";
 
@@ -345,7 +345,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 else
                 {
                     Guid user_guid = new Guid(user_id);
-                    User user = _userManager.GetUserById(user_guid);
+                    User? user = _userManager.GetUserById(user_guid);
                     if (user != null)
                     {
                         user_name = user.Username;
@@ -424,7 +424,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                     if (row["label"] is string user_id)
                     {
                         Guid user_guid = new Guid(user_id);
-                        User user = _userManager.GetUserById(user_guid);
+                        User? user = _userManager.GetUserById(user_guid);
 
                         if (user != null)
                         {
