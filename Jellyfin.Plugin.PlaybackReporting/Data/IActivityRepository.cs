@@ -19,7 +19,7 @@ using System.Collections.Generic;
 
 namespace Jellyfin.Plugin.PlaybackReporting.Data
 {
-    public interface IActivityRepository
+    public interface IActivityRepository : IDisposable
     {
         int RemoveUnknownUsers(List<string> known_user_ids);
         void ManageUserList(string action, string id);
