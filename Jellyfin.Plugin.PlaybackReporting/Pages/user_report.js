@@ -87,7 +87,7 @@ const getConfigurationPageUrl = (name) => {
                 //Set days filter to 50 years if 'all' option is selected.
                 if (days == -7) days = 18250;
 
-                var url = "user_usage_stats/user_activity?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime();
+                var url = "user_usage_stats/user_activity?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime();
                 url = window.ApiClient.getUrl(url);
                 window.ApiClient.getUserActivity(url).then(function (user_data) {
                     console.log("usage_data: " + JSON.stringify(user_data));

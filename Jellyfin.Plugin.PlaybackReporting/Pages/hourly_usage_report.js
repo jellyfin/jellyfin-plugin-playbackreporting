@@ -412,7 +412,7 @@ const getConfigurationPageUrl = (name) => {
                         if (days == -7) days = 18250;
 
                         const timezoneOffset = -(new Date().getTimezoneOffset() / 60);
-                        var url = "user_usage_stats/HourlyReport?days=" + days + "&end_date=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                        var url = "user_usage_stats/HourlyReport?days=" + days + "&endDate=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                         url = window.ApiClient.getUrl(url);
                         window.ApiClient.getUserActivity(url).then(function (usage_data) {
                             //alert("Loaded Data: " + JSON.stringify(usage_data));

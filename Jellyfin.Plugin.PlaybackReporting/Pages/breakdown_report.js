@@ -276,7 +276,7 @@ const getConfigurationPageUrl = (name) => {
                     const timezoneOffset = -(new Date().getTimezoneOffset() / 60);
 
                     // build user chart
-                    var url = "user_usage_stats/UserId/BreakdownReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/UserId/BreakdownReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -284,7 +284,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build ItemType chart
-                    var url = "user_usage_stats/ItemType/BreakdownReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/ItemType/BreakdownReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -292,7 +292,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build PlaybackMethod chart
-                    var url = "user_usage_stats/PlaybackMethod/BreakdownReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/PlaybackMethod/BreakdownReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -300,7 +300,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build ClientName chart
-                    var url = "user_usage_stats/ClientName/BreakdownReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/ClientName/BreakdownReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -308,7 +308,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build DeviceName chart
-                    var url = "user_usage_stats/DeviceName/BreakdownReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/DeviceName/BreakdownReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -316,7 +316,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build TvShows chart
-                    var url = "user_usage_stats/GetTvShowsReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/GetTvShowsReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -324,7 +324,7 @@ const getConfigurationPageUrl = (name) => {
                     });
 
                     // build Movies chart
-                    var url = "user_usage_stats/MoviesReport?days=" + days + "&end_date=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                    var url = "user_usage_stats/MoviesReport?days=" + days + "&endDate=" + end_date.value + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));

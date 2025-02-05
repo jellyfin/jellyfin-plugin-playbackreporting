@@ -209,7 +209,7 @@ const getConfigurationPageUrl = (name) => {
                         //Set days filter to 50 years if 'all' option is selected.
                         if (days == -7) days = 18250;
 
-                        var url = "user_usage_stats/DurationHistogramReport?days=" + days + "&end_date=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime();
+                        var url = "user_usage_stats/DurationHistogramReport?days=" + days + "&endDate=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime();
                         url = window.ApiClient.getUrl(url);
                         window.ApiClient.getUserActivity(url).then(function (usage_data) {
                             //alert("Loaded Data: " + JSON.stringify(usage_data));
