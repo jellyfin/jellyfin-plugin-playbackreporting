@@ -1,4 +1,4 @@
-﻿/*
+/*
 Copyright(C) 2018
 
 This program is free software: you can redistribute it and/or modify
@@ -19,16 +19,13 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackReporting.Data;
-using MediaBrowser.Controller;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.IO;
-using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -43,6 +40,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
         private readonly IFileSystem _fileSystem;
         private readonly Dictionary<string, PlaybackTracker>? playback_trackers = null;
         private IActivityRepository? _repository;
+        private bool _disposedFlag;
 
         public EventMonitorEntryPoint(
             ISessionManager sessionManager,
@@ -366,21 +364,32 @@ namespace Jellyfin.Plugin.PlaybackReporting
             _sessionManager.PlaybackStopped -= SessionManager_PlaybackStop;
             _sessionManager.PlaybackProgress -= SessionManager_PlaybackProgress;
 
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            if (_repository != null)
+            // ensure SQLite connection is closed to work around SQLite being read-only on Jellyfin reboot
+            if(_repository != null)
             {
                 _repository.Dispose();
                 _repository = null;
             }
+
+            return Task.CompletedTask;
+        }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedFlag)
+            {
+                if (disposing && _repository != null)
+                {
+                    _repository.Dispose();
+                    _repository = null;
+                }
+                _disposedFlag = true;
+            }
         }
 
-        ~EventMonitorEntryPoint()
+        public void Dispose()
         {
-            Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }
