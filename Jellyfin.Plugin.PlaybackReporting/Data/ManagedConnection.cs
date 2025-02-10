@@ -1,4 +1,4 @@
-﻿/*
+/*
 Copyright(C) 2018
 
 This program is free software: you can redistribute it and/or modify
@@ -59,10 +59,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
 
         public void Close()
         {
-            using (_db)
-            {
-
-            }
+            _db.Dispose();
         }
 
         public void Dispose()

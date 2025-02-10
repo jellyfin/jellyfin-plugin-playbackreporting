@@ -1,4 +1,4 @@
-﻿/*
+/*
 Copyright(C) 2018
 
 This program is free software: you can redistribute it and/or modify
@@ -62,6 +62,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
             _ = raw.sqlite3_enable_shared_cache(1);
 
             ThreadSafeMode = raw.sqlite3_threadsafe();
+            _ = raw.sqlite3_initialize();
         }
 
         private static bool _versionLogged;
@@ -156,11 +157,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
                 }
                 catch
                 {
-                    using (db)
-                    {
-
-                    }
-
+                    db.Dispose();
                     throw;
                 }
 
@@ -194,8 +191,9 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
         protected virtual void Dispose(bool dispose)
         {
             if (dispose)
-            {
+            {   
                 DisposeConnection();
+                _ = raw.sqlite3_shutdown();
             }
         }
 
@@ -215,8 +213,6 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
                             }
                             _connection = null;
                         }
-
-                        CloseConnection();
                     }
                 }
             }
@@ -226,10 +222,6 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
             }
         }
 
-        protected virtual void CloseConnection()
-        {
-
-        }
     }
 
     public static class ReaderWriterLockSlimExtensions
