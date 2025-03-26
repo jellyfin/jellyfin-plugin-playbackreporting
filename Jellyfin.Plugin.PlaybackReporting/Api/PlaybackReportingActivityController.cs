@@ -571,7 +571,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 last_seen += GetTimePart((int)(span.TotalDays / 365), "year");
             }
 
-            if ((int)(span.TotalDays % 365) > 7)
+            if ((double)(span.TotalDays % 365) > 7)
             {
                 last_seen += GetTimePart((int)((span.TotalDays % 365) / 7), "week");
             }
