@@ -21,6 +21,7 @@ using System.Linq;
 using System.Net.Mime;
 using Jellyfin.Data.Entities;
 using Jellyfin.Plugin.PlaybackReporting.Data;
+using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.IO;
@@ -32,7 +33,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.PlaybackReporting.Api
 {
     [ApiController]
-    [Authorize]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [Route("user_usage_stats")]
     [Produces(MediaTypeNames.Application.Json)]
     public class PlaybackReportingActivityController : ControllerBase
