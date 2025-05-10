@@ -57,7 +57,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
         {
             var trigger = new TaskTriggerInfo
             {
-                Type = TaskTriggerInfo.TriggerDaily,
+                Type = TaskTriggerInfoType.DailyTrigger,
                 TimeOfDayTicks = TimeSpan.FromHours(0).Ticks
             }; //12am
             return new[] { trigger };
