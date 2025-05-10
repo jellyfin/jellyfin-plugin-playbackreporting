@@ -53,7 +53,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
         {
             var trigger = new TaskTriggerInfo
             {
-                Type = TaskTriggerInfo.TriggerWeekly,
+                Type = TaskTriggerInfoType.WeeklyTrigger,
                 DayOfWeek = 0,
                 TimeOfDayTicks = TimeSpan.FromHours(3).Ticks
             }; //3am on Sunday

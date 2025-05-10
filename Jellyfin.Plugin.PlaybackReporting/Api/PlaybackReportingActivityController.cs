@@ -19,7 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
-using Jellyfin.Data.Entities;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.PlaybackReporting.Data;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Configuration;
