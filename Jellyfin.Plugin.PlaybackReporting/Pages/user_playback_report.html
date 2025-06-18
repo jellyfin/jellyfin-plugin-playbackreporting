@@ -5,7 +5,7 @@
 		<div class="content-primary" style="overflow-x: scroll;">
 			<h2>User Playback Report</h2>
 
-			<style>table { display: inline-block; }</style>
+			<style>table.filter_check_list { display: inline-block; }</style>
 			<table style="padding: 1px;margin:0;" cellpadding="5" cellspacing="5" class="paperList">
 				<tr>
 					<td>
@@ -59,23 +59,24 @@
 			</table>
 
 
-			<table style="padding: 4px;margin:0;" cellpadding="5" cellspacing="5" class="paperList">
+			<table style="padding: 4px;margin:0;" cellpadding="5" cellspacing="5" class="paperList filter_check_list" >
 				<tr>
 					<td>
-						<span id="filter_check_list"></span>
+						<span id="filter_check_list" ></span>
 					</td>
 				</tr>
 			</table>
 
 			<br />
 
-			<div style="width: 100%; margin:0; padding-top: 50px">
+			<div style="width: 80%; margin:0; padding-top: 50px">
 				<canvas id="user_stats_chart_canvas"></canvas>
 			</div>
 
 			<br /><br />
 			<div>
 				User : <span id="user_report_user_name" style="font-weight: bold;">Select a user from the chart</span> <span id="user_report_on_date"></span>
+
 				<table cellpadding="6" id="user_usage_report_table" style="width:100%;">
 					<thead>
 						<tr style="text-align: left;">
