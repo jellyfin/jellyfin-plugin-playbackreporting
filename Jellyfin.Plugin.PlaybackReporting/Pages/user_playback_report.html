@@ -5,41 +5,54 @@
 		<div class="content-primary" style="overflow-x: scroll;">
 			<h2>User Playback Report</h2>
 
-			<table style="border: 1px solid black; padding: 1px;" cellpadding="5" cellspacing="5">
+			<table style="padding: 1px;margin:0;" cellpadding="5" cellspacing="5" class="paperList">
 				<tr>
 					<td>
 						End Date:
 					</td>
 					<td>
-						<input type="date" id="end_date" />
+						<input type="date" id="end_date" style="padding: .5em;" class="emby-select-withcolor emby-select"/>
 					</td>
 					<td>
 						Weeks:
 					</td>
 					<td>
-						<select id="weeks">
-							<option value="1">1</option>
-							<option value="2">2</option>
-							<option value="3">3</option>
-							<option value="4" selected>4</option>
-							<option value="5">5</option>
-							<option value="6">6</option>
-							<option value="7">7</option>
-							<option value="8">8</option>
-							<option value="9">9</option>
-							<option value="10">10</option>
-							<option value="11">11</option>
-							<option value="12">12</option>
-						</select>
+						<div class="selectContainer" style="margin:0;">
+							<select is="emby-select" id="weeks" class="emby-select-withcolor emby-select">
+								<option value="1">1</option>
+								<option value="2">2</option>
+								<option value="3">3</option>
+								<option value="4" selected>4</option>
+								<option value="5">5</option>
+								<option value="6">6</option>
+								<option value="7">7</option>
+								<option value="8">8</option>
+								<option value="9">9</option>
+								<option value="10">10</option>
+								<option value="11">11</option>
+								<option value="12">12</option>
+								<option value="-1">All</option>
+							</select>
+							<div class="selectArrowContainer">
+								<div style="visibility:hidden;display:none;">0</div>
+								<span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true" style="margin-top: 0.2em;"></span>
+							</div>
+						</div>
 					</td>
 					<td>
 						Report Type:
 					</td>
 					<td>
-						<select id="data_type">
-							<option value="count">Play Count</option>
-							<option value="time">Play Time</option>
-						</select>
+						<div class="selectContainer" style="margin:0;">
+							<select is="emby-select" id="data_type" class="emby-select-withcolor emby-select">
+								<option value="count">Play Count</option>
+								<option value="time">Play Time</option>
+							</select>
+							<div class="selectArrowContainer">
+								<div style="visibility:hidden;display:none;">0</div>
+								<span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true" style="margin-top: 0.2em;"></span>
+							</div>
+						</div>
 					</td>
 					<td>
 						<span id="filter_check_list"></span>
@@ -55,7 +68,7 @@
 			<br /><br />
 			<div>
 				User : <span id="user_report_user_name" style="font-weight: bold;">Select a user from the chart</span> <span id="user_report_on_date"></span>
-				<table cellpadding="6" id="user_usage_report_table">
+				<table cellpadding="6" id="user_usage_report_table" style="width:100%;">
 					<thead>
 						<tr style="text-align: left;">
 							<th class="detailTableHeaderCell" data-priority="2">Time</th>
@@ -67,7 +80,14 @@
 							<th class="detailTableHeaderCell" data-priority="3">Duration</th>
 						</tr>
 					</thead>
-					<tbody class="resultBody" id="user_usage_report_results"></tbody>
+					<tbody class="resultBody" id="user_usage_report_results">
+						<tr class="detailTableBodyRow detailTableBodyRow-shaded">
+							<td colspan="8" style="text-align: center;"></td>
+						</tr>
+						<tr class="detailTableBodyRow detailTableBodyRow-shaded">
+							<td colspan="8" style="text-align: center;">No data to show, please click on a user from the chart.</td>
+						</tr>
+					</tbody>
 				</table>
 			</div>
 		</div>

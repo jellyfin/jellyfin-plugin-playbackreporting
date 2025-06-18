@@ -6,19 +6,29 @@
 		<div class="content-primary" style="overflow-x: scroll;">
 			<h2>Custom Query Report</h2>
 
-
-			<h3>Custom SQL Query</h3>
-			<textarea id="custom_query_text" style="width: 98%; height:75px">
+			<div class="inputContainer"> 
+				<label class="textareaLabel textareaLabelUnfocused" for="custom_query_text">Custom SQL Query</label>
+				<textarea is="emby-textarea" id="custom_query_text" label="Custom SQL Query" class="textarea-mono emby-textarea" style="width: 100%; height:175px; margin: 15px 0;">
 SELECT ROWID, * 
 FROM PlaybackActivity 
 ORDER BY rowid DESC 
 LIMIT 10
-			</textarea>
-			<br />
-			<br />
-			<input type='checkbox' id="replace_userid" checked="checked"> Replace UserId with UserName<br />
-			<br />
-			<button id="run_custom_query">Run</button>
+</textarea> 
+				<div class="fieldDescription">Run a custom query to generate a report.</div> 
+			</div>
+
+			<div class="checkboxList paperList" style="padding:.5em 1em; margin-bottom: 1.8em;"> 
+				<label class="emby-checkbox-label"> 
+					<input type="checkbox" is="emby-checkbox" id="replace_userid" checked="checked" data-embycheckbox="true" class="emby-checkbox"> 
+					<span class="checkboxLabel">Replace UserId with UserName</span> 
+					<span class="checkboxOutline">
+						<span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span>
+						<span class="material-icons checkboxIcon checkboxIcon-unchecked " aria-hidden="true"></span>
+					</span>
+				</label> 
+			</div>
+
+			<button is="emby-button" id="run_custom_query" class="raised button-submit block emby-button" style="width: auto;"> <span>Run</span> </button>
 
 			<h3>Query Result</h3>
 			<div id="query_result_message"> </div>
