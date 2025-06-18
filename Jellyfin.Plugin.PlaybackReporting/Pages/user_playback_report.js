@@ -467,7 +467,7 @@ const getConfigurationPageUrl = (name) => {
 
                     // build filter list
                     var filter_items = "";
-                    for (var x = 0; x < filter_names.length; x++) {
+                    for (var x1 = 0; x1 < filter_names.length; x1++) {
                         var filter_name_01 = filter_names[x1];
                         filter_items += `<label class="emby-checkbox-label" style="width: 6em;line-height: 39px;">
 							<input type="checkbox" is="emby-checkbox" id='media_type_filter_` + filter_name_01 + `' data_fileter_name='` + filter_name_01 + `' data-embycheckbox="true" checked class="emby-checkbox"> 
