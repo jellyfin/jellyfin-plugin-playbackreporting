@@ -357,11 +357,11 @@ const getConfigurationPageUrl = (name) => {
 
             td = document.createElement("td");
             var btn = document.createElement("BUTTON");
-            var i = document.createElement("i");
-            i.className = "md-icon";
+            btn.className = "raised headerHelpButton emby-button";
+            btn.setAttribute('style', 'margin:0 !important');
+            btn.style.fontSize = "13px";
             var t = document.createTextNode("remove");
-            i.appendChild(t);
-            btn.appendChild(i);
+            btn.appendChild(t);
             btn.setAttribute("title", "Remove");
             btn.addEventListener("click", function () { remove_item(item_details.RowId, user_name, user_id, data_label, view); });
 
