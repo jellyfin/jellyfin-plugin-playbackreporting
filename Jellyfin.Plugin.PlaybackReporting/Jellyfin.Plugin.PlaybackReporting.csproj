@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Data" Version="10.*-*" />
-    <PackageReference Include="Jellyfin.Controller" Version="10.*-*" />
+    <PackageReference Include="Jellyfin.Data" Version="10.10.7" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.10.7" />
     <PackageReference Include="SQLitePCL.pretty.netstandard" Version="3.1.0" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
