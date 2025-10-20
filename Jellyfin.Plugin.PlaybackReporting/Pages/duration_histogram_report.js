@@ -175,7 +175,14 @@ const getConfigurationPageUrl = (name) => {
                     var filter_items = "";
                     for (var x1 = 0; x1 < filter_names.length; x1++) {
                         var filter_name_01 = filter_names[x1];
-                        filter_items += "<input type='checkbox' id='media_type_filter_" + filter_name_01 + "' data_fileter_name='" + filter_name_01 + "' checked> " + filter_name_01 + " ";
+                        filter_items += `<label class="emby-checkbox-label" style="width: auto;line-height: 39px;padding-right: 10px;">
+							<input type="checkbox" is="emby-checkbox" id='media_type_filter_` + filter_name_01 + `' data_fileter_name='` + filter_name_01 + `' data-embycheckbox="true" checked class="emby-checkbox"> 
+							<span class="checkboxLabel">` + filter_name_01 + `</span> 
+							<span class="checkboxOutline">
+								<span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span>
+								<span class="material-icons checkboxIcon checkboxIcon-unchecked " aria-hidden="true"></span>
+							</span>
+						</label> `;
                     }
 
                     var filter_check_list = view.querySelector('#filter_check_list');

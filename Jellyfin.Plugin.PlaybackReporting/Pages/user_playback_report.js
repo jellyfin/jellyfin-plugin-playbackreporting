@@ -357,11 +357,11 @@ const getConfigurationPageUrl = (name) => {
 
             td = document.createElement("td");
             var btn = document.createElement("BUTTON");
-            var i = document.createElement("i");
-            i.className = "md-icon";
+            btn.className = "raised headerHelpButton emby-button";
+            btn.setAttribute('style', 'margin:0 !important');
+            btn.style.fontSize = "13px";
             var t = document.createTextNode("remove");
-            i.appendChild(t);
-            btn.appendChild(i);
+            btn.appendChild(t);
             btn.setAttribute("title", "Remove");
             btn.addEventListener("click", function () { remove_item(item_details.RowId, user_name, user_id, data_label, view); });
 
@@ -467,9 +467,16 @@ const getConfigurationPageUrl = (name) => {
 
                     // build filter list
                     var filter_items = "";
-                    for (var x = 0; x < filter_names.length; x++) {
-                        var filter_name = filter_names[x];
-                        filter_items += "<input type='checkbox' id='media_type_filter_" + filter_name + "' data_fileter_name='" + filter_name + "' checked> " + filter_name + " ";
+                    for (var x1 = 0; x1 < filter_names.length; x1++) {
+                        var filter_name_01 = filter_names[x1];
+                        filter_items += `<label class="emby-checkbox-label" style="width: auto;line-height: 39px;padding-right: 10px;">
+							<input type="checkbox" is="emby-checkbox" id='media_type_filter_` + filter_name_01 + `' data_fileter_name='` + filter_name_01 + `' data-embycheckbox="true" checked class="emby-checkbox"> 
+							<span class="checkboxLabel">` + filter_name_01 + `</span> 
+							<span class="checkboxOutline">
+								<span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span>
+								<span class="material-icons checkboxIcon checkboxIcon-unchecked " aria-hidden="true"></span>
+							</span>
+						</label> `;
                     }
 
                     var filter_check_list = view.querySelector('#filter_check_list');

@@ -2,31 +2,41 @@
 	 data-require="emby-button,emby-select,emby-checkbox"
 	 data-controller="__plugin/playback_report_settings.js">
 	<div data-role="content">
-		<div class="content-primary" style="overflow-x: scroll;">
+		<div class="content-primary" style="overflow-x: scroll;max-width: 60em;">
 			<h2>Playback Report Settings</h2>
 			<h3>
 				<strong>Data Retention</strong>
 			</h3>
-			<p>
-				Keep data for X time, this is used in the scheduled task to trim your data and keep only data within the requested time period.<br />
-				As you add and remove users from your system playback activity for old deleted users becomes assigned to unknown, you can remove this data to clean up your reports.
-			</p>
-			Keep data for
-			<select id="max_data_age_select">
-				<option value="0">Clear All</option>
-				<option value="1">1 Month</option>
-				<option value="2">2 Months</option>
-				<option value="3">3 Months</option>
-				<option value="6">6 Months</option>
-				<option value="12">1 Year</option>
-				<option value="24">2 Years</option>
-				<option value="36">3 Years</option>
-				<option value="-1">Forever</option>
-			</select>
-			<p>
-				<button id="remove_unknown_button">Remove Unknown Users</button> - Remove unknown or deleted users from the playback data.
-			</p>
+			<div class="selectContainer" style="width: 20em;">
+				<label class="selectLabel" for="max_data_age_select">Keep data for</label>
+				<select is="emby-select" id="max_data_age_select" label="Data Retention" class="emby-select-withcolor emby-select">
+					<option value="0">Clear All</option>
+					<option value="1">1 Month</option>
+					<option value="2">2 Months</option>
+					<option value="3">3 Months</option>
+					<option value="6">6 Months</option>
+					<option value="12">1 Year</option>
+					<option value="24">2 Years</option>
+					<option value="36">3 Years</option>
+					<option value="-1">Forever</option>
+				</select> 
+				<div class="fieldDescription"> 
+					Keep data for X time, this is used in the scheduled task to trim your data and keep only data within the requested time period.<br />
+					As you add and remove users from your system playback activity for old deleted users becomes assigned to unknown, you can remove this data to clean up your reports.
+				</div>
+				<div class="selectArrowContainer">
+					<div style="visibility:hidden;display:none;">0</div>
+					<span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span>
+				</div>
+			</div>
+
+			<div class="inputContainer">
+				<label class="selectLabel" for="remove_unknown_button">Clean unknown users</label>
+				<button is="emby-button" id="remove_unknown_button" class="raised button-delete emby-button">Remove Unknown Users</button>
+				<div class="fieldDescription">Remove unknown or deleted users from the playback data.</div> 
+			</div>
 			<br />
+
 			<h3>
 				<strong>Backup</strong>
 			</h3>
@@ -36,32 +46,52 @@
 				The saved backup data is in TSV format so can be loaded into other tools like Excel to build highly customised reports.
 			</p>
 			<p>
-				<button id="set_backup_path">Set Backup Path</button> - Backup Path: <span id="backup_path_label"></span><br />
+				<button is="emby-button" id="set_backup_path" class="raised headerHelpButton emby-button" style="margin-left: 0 !important;">Set Backup Path</button>  Backup Path: <span id="backup_path_label"></span><br />
 			</p>
-			<p>
-				Backup files to keep
-				<select id="files_to_keep">
+
+			<div class="selectContainer" style="width: 20em;">
+				<label class="selectLabel" for="files_to_keep">Backup files to keep</label>
+				<select is="emby-select" id="files_to_keep" label="Backup files to keep" class="emby-select-withcolor emby-select">
 					<option value="1">1</option>
 					<option value="5">5</option>
 					<option value="10">10</option>
 					<option value="15">15</option>
 					<option value="20">20</option>
-				</select>
-			</p>
+				</select> 
+				<div class="selectArrowContainer">
+					<div style="visibility:hidden;display:none;">0</div>
+					<span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span>
+				</div>
+			</div>
+
 			<p>
-				<button id="backup_data_now">Save Backup Data</button>
-				<button id="load_backup_data">Load Backup Data</button>
+				<button id="backup_data_now" class="raised button-submit emby-button">Save Backup Data</button>
+				<button id="load_backup_data" class="raised emby-button">Load Backup Data</button>
 			</p>
 			<br />
 
 			<h3>
 				<strong>Ignored User List</strong>
 			</h3>
+
+			<label class="selectLabel" for="user_list_for_add" style="margin-bottom:15px;">Users can be set to ignored so you can have test users and admins that are not included in any of the reports.</label>
+			
+			<div class="selectContainer" style="width: 20em;">
+				<select is="emby-select" id="user_list_for_add" label="Data Retention" class="emby-select-withcolor emby-select">
+				</select> 
+				<div class="selectArrowContainer">
+					<div style="visibility:hidden;display:none;">0</div>
+					<span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true" style="margin: 0.2em;"></span>
+				</div>
+			</div>
+
+			<button id="add_user_to_list" class="raised button-submit emby-button">Add</button> 
+			<button id="remove_user_from_list" class="raised button-delete emby-button">Remove</button>
+
 			<p>
-				Users can be set to ignored so you can have test users and admins that are not included in any of the reports.
+				Ignored users:
 			</p>
-			<select id="user_list_for_add"></select> <button id="add_user_to_list">Add</button> <button id="remove_user_from_list">Remove</button>
-			<ul id="user_list_items"></ul>
+			<ul id="user_list_items">This list is empty.</ul>
 
 		</div>
 	</div>
