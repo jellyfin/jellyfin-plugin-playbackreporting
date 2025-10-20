@@ -2,7 +2,7 @@
 name: "Playback Reporting"
 guid: "5c534381-91a3-43cb-907a-35aa02eb9d2c"
 imageUrl: "https://repo.jellyfin.org/releases/plugin/images/jellyfin-plugin-playbackreporting.png"
-version: 16
+version: 17
 targetAbi: "10.11.0.0"
 framework: net9.0
 owner: "jellyfin"
@@ -13,10 +13,4 @@ artifacts:
   - "Jellyfin.Plugin.PlaybackReporting.dll"
   - "SQLitePCL.pretty.dll"
 changelog: |-
-  - fix: require admin privileges to access API (#104) @Theta-Dev
-  - Fix GetLastSeenString method (#103) @Nathan5471
-  - Fix database connection disposal on server shutdown (#98) @a-mnich
-  - fix nullable warnings (#99) @a-mnich
-
-  ### Bug Fixes ###
-  - Improve Timezone Handling and Fix End Date Picker (#101) @a-mnich
+  - Jellyfin 10.11 support (#108) @crobibero
