@@ -133,7 +133,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         public ActionResult<bool> PruneUnknownUsers()
         {
             List<string> userIdList = new List<string>();
-            foreach (var jellyfinUser in _userManager.Users)
+            foreach (var jellyfinUser in _userManager.GetUsers())
             {
                 userIdList.Add(jellyfinUser.Id.ToString("N"));
             }
@@ -182,7 +182,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
 
             List<Dictionary<string, object>> users = new List<Dictionary<string, object>>();
 
-            foreach (var jellyfinUser in _userManager.Users)
+            foreach (var jellyfinUser in _userManager.GetUsers())
             {
                 Dictionary<string, object> user_info = new Dictionary<string, object>
                 {
@@ -541,7 +541,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 colums[index_of_user_col] = "UserName";
 
                 Dictionary<string, string> user_map = new Dictionary<string, string>();
-                foreach (var user in _userManager.Users)
+                foreach (var user in _userManager.GetUsers())
                 {
                     user_map.Add(user.Id.ToString("N"), user.Username);
                 }
