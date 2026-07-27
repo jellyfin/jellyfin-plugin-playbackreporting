@@ -102,7 +102,7 @@ const getConfigurationPageUrl = (name) => {
 
     function loadBackupFile(selectedFile, view) {
         var encoded_path = encodeURI(selectedFile);
-        var url = "user_usage_stats/load_backup?backupfile=" + encoded_path + "&stamp=" + new Date().getTime();
+        var url = "user_usage_stats/load_backup?backupfilepath=" + encoded_path + "&stamp=" + new Date().getTime();
         url = window.ApiClient.getUrl(url);
         window.ApiClient.getUserActivity(url).then(function (responce_message) {
             //alert("Loaded Data Message : " + JSON.stringify(responce_message));
