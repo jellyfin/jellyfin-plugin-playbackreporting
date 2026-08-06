@@ -45,23 +45,8 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
             get { return TransactionMode.Deferred; }
         }
 
-        internal static int ThreadSafeMode { get; set; }
-
         static BaseSqliteRepository()
         {
-            SQLite3.EnableSharedCache = false;
-
-            _ = raw.sqlite3_config(raw.SQLITE_CONFIG_MEMSTATUS, 0);
-            //CheckOk(rc);
-
-            _ = raw.sqlite3_config(raw.SQLITE_CONFIG_MULTITHREAD, 1);
-            //rc = raw.sqlite3_config(raw.SQLITE_CONFIG_SINGLETHREAD, 1);
-            //rc = raw.sqlite3_config(raw.SQLITE_CONFIG_SERIALIZED, 1);
-            //CheckOk(rc);
-
-            _ = raw.sqlite3_enable_shared_cache(1);
-
-            ThreadSafeMode = raw.sqlite3_threadsafe();
         }
 
         private static bool _versionLogged;
@@ -253,18 +238,10 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
 
         public static IDisposable Read(this ReaderWriterLockSlim obj)
         {
-            //if (BaseSqliteRepository.ThreadSafeMode > 0)
-            //{
-            //    return new DummyToken();
-            //}
             return new WriteLockToken(obj);
         }
         public static IDisposable Write(this ReaderWriterLockSlim obj)
         {
-            //if (BaseSqliteRepository.ThreadSafeMode > 0)
-            //{
-            //    return new DummyToken();
-            //}
             return new WriteLockToken(obj);
         }
     }
