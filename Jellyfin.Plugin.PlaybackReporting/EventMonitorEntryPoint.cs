@@ -248,7 +248,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
 
                     PlaybackInfo play_info = new PlaybackInfo(
                         id: Guid.NewGuid().ToString("N"),
-                        date: DateTime.Now,
+                        date: DateTime.UtcNow,
                         clientName: e.ClientName,
                         deviceName: e.DeviceName,
                         playbackMethod: play_method,

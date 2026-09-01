@@ -87,12 +87,55 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
 
         public static DateTime ReadDateTime(this ResultSetValue result)
         {
-            var dateText = result.ToString();
+            return result.ToString().ParseDateTimeToUtc();
+        }
 
-            return DateTime.ParseExact(
+        public static DateTime ParseDateTimeToUtc(this string dateText, TimeZoneInfo? legacyTimezone = null)
+        {
+            DateTime parsed = DateTime.ParseExact(
                 dateText, _datetimeFormats,
                 DateTimeFormatInfo.InvariantInfo,
-                DateTimeStyles.None).ToUniversalTime();
+                DateTimeStyles.None);
+            if (parsed.Kind == DateTimeKind.Utc || dateText.EndsWith("Z", StringComparison.OrdinalIgnoreCase) || HasExplicitOffset(dateText))
+            {
+                return DateTimeOffset.ParseExact(dateText, _datetimeFormats, DateTimeFormatInfo.InvariantInfo, DateTimeStyles.None).UtcDateTime;
+            }
+
+            return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified), legacyTimezone ?? TimeZoneInfo.Utc);
+        }
+
+        private static bool HasExplicitOffset(string text)
+        {
+            // A '+' or '-' inside the first 10 characters is a date separator ("yyyy-MM-dd");
+            // later in the string it only counts as an explicit UTC offset when the remaining
+            // tail is shaped like one ("+HH", "+HHmm", "+HH:mm").
+            int separator = text.LastIndexOfAny(new[] { '+', '-' });
+            if (separator < 10)
+            {
+                return false;
+            }
+
+            string tail = text.Substring(separator + 1);
+            return (tail.Length == 5 && tail[2] == ':') || tail.Length == 4 || tail.Length == 2;
+        }
+
+        public static DateTime TruncateToSeconds(this DateTime dateValue)
+        {
+            return new DateTime(
+                dateValue.Ticks - (dateValue.Ticks % TimeSpan.TicksPerSecond),
+                dateValue.Kind);
+        }
+
+        /// <summary>
+        /// Formats a DateTime for the PlaybackActivity DateCreated column: converted to UTC and
+        /// truncated to whole seconds, always producing the fixed-width "yyyy-MM-dd HH:mm:ssZ" shape.
+        /// DateCreated values are stored and compared as TEXT by SQLite, so every value must share
+        /// this exact shape: a fractional-seconds value would sort before a whole-seconds value
+        /// ('.' sorts before 'Z') and break the >= / < comparisons.
+        /// </summary>
+        public static string ToUtcDateParamValue(this DateTime dateValue)
+        {
+            return dateValue.ToUniversalTime().TruncateToSeconds().ToDateTimeParamValue();
         }
 
         private static void CheckName(string name)
