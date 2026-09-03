@@ -791,7 +791,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
                     row_data.Add("user_id", user_id);
 
                     int action_count = row[2].ToInt();
-                    int seconds_sum = row[3].ToInt();
+                    long seconds_sum = row[3].ToInt64();
                     row_data.Add("total_count", action_count);
                     row_data.Add("total_time", seconds_sum);
 
