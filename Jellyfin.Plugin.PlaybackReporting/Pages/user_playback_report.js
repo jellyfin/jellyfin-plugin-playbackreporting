@@ -266,8 +266,8 @@ const getConfigurationPageUrl = (name) => {
             }
         }
 
-        const tzOffset = -(new Date().getTimezoneOffset() / 60);
-        var url_to_get = "user_usage_stats/" + user_id + "/" + data_label + "/GetItems?filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + tzOffset;
+        const timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var url_to_get = "user_usage_stats/" + user_id + "/" + data_label + "/GetItems?filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneId=" + encodeURIComponent(timezoneId);
         url_to_get = window.ApiClient.getUrl(url_to_get);
         console.log("User Report Details Url: " + url_to_get);
 
@@ -491,8 +491,8 @@ const getConfigurationPageUrl = (name) => {
                     weeks.addEventListener("change", process_click);
                     var days = parseInt(weeks.value) * 7;
 
-                    const tzOffset = -(new Date().getTimezoneOffset() / 60);
-                    var url = "user_usage_stats/PlayActivity?filter=" + filter_names.join(",") + "&days=" + days + "&endDate=" + end_date.value + "&dataType=count&stamp=" + new Date().getTime() + "&timezoneOffset=" + tzOffset;
+                    const timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    var url = "user_usage_stats/PlayActivity?filter=" + filter_names.join(",") + "&days=" + days + "&endDate=" + end_date.value + "&dataType=count&stamp=" + new Date().getTime() + "&timezoneId=" + encodeURIComponent(timezoneId);
                     url = window.ApiClient.getUrl(url);
                     window.ApiClient.getUserActivity(url).then(function (usage_data) {
                         //alert("Loaded Data: " + JSON.stringify(usage_data));
@@ -518,8 +518,8 @@ const getConfigurationPageUrl = (name) => {
                         days = parseInt(weeks.value) * 7;
 
 
-                        const tzOffset = -(new Date().getTimezoneOffset() / 60);
-                        var filtered_url = "user_usage_stats/PlayActivity?filter=" + filter.join(",") + "&days=" + days + "&endDate=" + end_date.value + "&dataType=" + data_t + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + tzOffset;
+                        const timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        var filtered_url = "user_usage_stats/PlayActivity?filter=" + filter.join(",") + "&days=" + days + "&endDate=" + end_date.value + "&dataType=" + data_t + "&stamp=" + new Date().getTime() + "&timezoneId=" + encodeURIComponent(timezoneId);
                         filtered_url = window.ApiClient.getUrl(filtered_url);
                         window.ApiClient.getUserActivity(filtered_url).then(function (usage_data) {
                             draw_graph(view, d3, usage_data);

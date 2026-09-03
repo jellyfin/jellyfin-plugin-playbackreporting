@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
 {
     public interface IActivityRepository : IDisposable
     {
+        void Initialize();
         int RemoveUnknownUsers(List<string> known_user_ids);
         void ManageUserList(string action, string id);
         List<string> GetUserList();
@@ -30,14 +31,14 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
         void DeleteOldData(DateTime? del_before);
         void AddPlaybackAction(PlaybackInfo play_info);
         void UpdatePlaybackAction(PlaybackInfo play_info);
-        List<Dictionary<string, string>> GetUsageForUser(string date, string user_id, string[] filter, float timezoneOffset);
-        Dictionary<String, Dictionary<string, int>> GetUsageForDays(int days, DateTime end_date, string[] types, string? data_type, float timezoneOffset);
-        SortedDictionary<string, int> GetHourlyUsageReport(int days, DateTime end_date, string[] types, float timezoneOffset);
-        List<Dictionary<string, object>> GetBreakdownReport(int days, DateTime end_date, string type, float timezoneOffset);
-        SortedDictionary<int, int> GetDurationHistogram(int days, DateTime end_date, string[] types);
-        List<Dictionary<string, object>> GetTvShowReport(int days, DateTime end_date, float timezoneOffset);
-        List<Dictionary<string, object>> GetMoviesReport(int days, DateTime end_date, float timezoneOffset);
-        List<Dictionary<string, object>> GetUserReport(int days, DateTime end_date, float timezoneOffset);
+        List<Dictionary<string, string>> GetUsageForUser(string date, string user_id, string[] filter, string timezoneId);
+        Dictionary<String, Dictionary<string, int>> GetUsageForDays(int days, DateTime end_date, string[] types, string? data_type, string timezoneId);
+        SortedDictionary<string, int> GetHourlyUsageReport(int days, DateTime end_date, string[] types, string timezoneId);
+        List<Dictionary<string, object>> GetBreakdownReport(int days, DateTime end_date, string type, string timezoneId);
+        SortedDictionary<int, int> GetDurationHistogram(int days, DateTime end_date, string[] types, string timezoneId);
+        List<Dictionary<string, object>> GetTvShowReport(int days, DateTime end_date, string timezoneId);
+        List<Dictionary<string, object>> GetMoviesReport(int days, DateTime end_date, string timezoneId);
+        List<Dictionary<string, object>> GetUserReport(int days, DateTime end_date, string timezoneId);
         string RunCustomQuery(string query_string, List<string> col_names, List<List<object>> results);
     }
 }

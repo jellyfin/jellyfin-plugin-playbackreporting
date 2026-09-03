@@ -411,8 +411,8 @@ const getConfigurationPageUrl = (name) => {
                         //Set days filter to 50 years if 'all' option is selected.
                         if (days == -7) days = 18250;
 
-                        const timezoneOffset = -(new Date().getTimezoneOffset() / 60);
-                        var url = "user_usage_stats/HourlyReport?days=" + days + "&endDate=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneOffset=" + timezoneOffset;
+                        const timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        var url = "user_usage_stats/HourlyReport?days=" + days + "&endDate=" + end_date.value + "&filter=" + filter.join(",") + "&stamp=" + new Date().getTime() + "&timezoneId=" + encodeURIComponent(timezoneId);
                         url = window.ApiClient.getUrl(url);
                         window.ApiClient.getUserActivity(url).then(function (usage_data) {
                             //alert("Loaded Data: " + JSON.stringify(usage_data));
