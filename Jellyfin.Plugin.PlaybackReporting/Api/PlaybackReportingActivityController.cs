@@ -109,7 +109,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 }
                 user_info.Add("last_seen", last_seen_string);
 
-                int seconds = (int)user_info["total_time"];
+                long seconds = (long)user_info["total_time"];
                 TimeSpan total_time = new TimeSpan(10000000L * (long)seconds);
 
                 string time_played = GetLastSeenString(total_time);
