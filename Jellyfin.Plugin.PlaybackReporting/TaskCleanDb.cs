@@ -49,7 +49,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
 
             _logger.LogInformation("TaskCleanDb Loaded");
             var repo = new ActivityRepository(loggerFactory.CreateLogger<ActivityRepository>(), _config.ApplicationPaths, _fileSystem);
-            //repo.Initialize();
+            repo.Initialize();
             Repository = repo;
         }
 
@@ -88,7 +88,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
                 }
                 else
                 {
-                    DateTime del_defore = DateTime.Now.AddMonths(max_data_age * -1);
+                    DateTime del_defore = DateTime.UtcNow.AddMonths(max_data_age * -1);
                     Repository.DeleteOldData(del_defore);
                 }
             }, cancellationToken);

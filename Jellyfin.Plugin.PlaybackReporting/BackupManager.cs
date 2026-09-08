@@ -39,6 +39,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
             _logger = loggerFactory.CreateLogger<BackupManager>();
 
             _repository = new ActivityRepository(loggerFactory.CreateLogger<ActivityRepository>(), _config.ApplicationPaths, _fileSystem);
+            _repository.Initialize();
         }
 
 

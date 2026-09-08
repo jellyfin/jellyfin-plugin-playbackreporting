@@ -60,7 +60,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
 
             _logger.LogInformation("PlaybackReportingActivityController Loaded");
             var repo = new ActivityRepository(loggerFactory.CreateLogger<ActivityRepository>(), _config.ApplicationPaths, _fileSystem);
-            //repo.Initialize();
+            repo.Initialize();
             _repository = repo;
         }
 
@@ -79,14 +79,15 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// Gets a report of the available activity per hour.
         /// </summary>
         /// <param name="days">Number of Days</param>
-        /// <param name="endDate">Optional. End date of the report in yyyy-MM-dd format. Defaults to <see cref="DateTime.Now"/>.</param>
+        /// <param name="endDate">Optional. End date of the report in yyyy-MM-dd format. Defaults to today's date in the client's timezone.</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">Report returned.</response>
         /// <returns></returns>
         [HttpGet("user_activity")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetUserReport([FromQuery] int days, [FromQuery] DateTime? endDate, [FromQuery] float? timezoneOffset)
+        public ActionResult GetUserReport([FromQuery] int days, [FromQuery] DateTime? endDate, [FromQuery] string? timezoneId)
         {
-            List<Dictionary<string, object>> report = _repository.GetUserReport(days, endDate ?? DateTime.Now, timezoneOffset ?? 0);
+            List<Dictionary<string, object>> report = _repository.GetUserReport(days, ResolveDate(endDate, timezoneId), timezoneId ?? "UTC");
 
             foreach(var user_info in report)
             {
@@ -100,7 +101,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 user_info.Add("has_image", has_image);
 
                 DateTime last_seen = (DateTime)user_info["latest_date"];
-                TimeSpan time_ago = DateTime.Now.Subtract(last_seen);
+                TimeSpan time_ago = DateTime.UtcNow.Subtract(last_seen);
 
                 string last_seen_string = GetLastSeenString(time_ago);
                 if (last_seen_string == "")
@@ -202,11 +203,12 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// <param name="userId">User Id.</param>
         /// <param name="date">UTC DateTime, Format yyyy-MM-dd.</param>
         /// <param name="filter">Comma separated list of media types to filter (movies,series).</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">Activity returned.</response>
         /// <returns></returns>
         [HttpGet("{userId}/{date}/GetItems")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetUserReportData([FromRoute] string userId, [FromRoute] string date, [FromQuery] string? filter, [FromQuery] float? timezoneOffset)
+        public ActionResult GetUserReportData([FromRoute] string userId, [FromRoute] string date, [FromQuery] string? filter, [FromQuery] string? timezoneId)
         {
             string[] filter_tokens = Array.Empty<string>();
             if (filter != null)
@@ -214,7 +216,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 filter_tokens = filter.Split(',');
             }
 
-            List<Dictionary<string, string>> results = _repository.GetUsageForUser(date, userId, filter_tokens, timezoneOffset ?? 0);
+            List<Dictionary<string, string>> results = _repository.GetUsageForUser(date, userId, filter_tokens, timezoneId ?? "UTC");
 
             List<Dictionary<string, object>> user_activity = new List<Dictionary<string, object>>();
 
@@ -296,11 +298,12 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
         /// <param name="filter">Comma separated list of media types to filter (movies,series).</param>
         /// <param name="dataType">Data type to return (count,time).</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">Activity returned.</response>
         /// <returns></returns>
         [HttpGet("PlayActivity")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetUsageStats(int days, DateTime? endDate, string? filter, string? dataType, [FromQuery] float? timezoneOffset)
+        public ActionResult GetUsageStats(int days, DateTime? endDate, string? filter, string? dataType, [FromQuery] string? timezoneId)
         {
             string[] filter_tokens = Array.Empty<string>();
             if (filter != null)
@@ -308,9 +311,9 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 filter_tokens = filter.Split(',');
             }
 
-            endDate ??= DateTime.Now;
+            DateTime resolvedEndDate = ResolveDate(endDate, timezoneId);
 
-            Dictionary<String, Dictionary<string, int>> results = _repository.GetUsageForDays(days, endDate.Value, filter_tokens, dataType, timezoneOffset ?? 0);
+            Dictionary<String, Dictionary<string, int>> results = _repository.GetUsageForDays(days, resolvedEndDate, filter_tokens, dataType, timezoneId ?? "UTC");
 
             // add empty user for labels
             results.Add("labels_user", new Dictionary<string, int>());
@@ -322,8 +325,8 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
 
                 // fill in missing dates for time period
                 SortedDictionary<string, int> userUsageByDate = new SortedDictionary<string, int>();
-                DateTime from_date = endDate.Value.AddDays(days * -1 + 1);
-                while (from_date <= endDate.Value)
+                DateTime from_date = resolvedEndDate.AddDays(days * -1 + 1);
+                while (from_date <= resolvedEndDate)
                 {
                     string date_string = from_date.ToString("yyyy-MM-dd");
                     if (user_usage.ContainsKey(date_string) == false)
@@ -374,10 +377,11 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// <param name="days">Number of Days.</param>
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
         /// <param name="filter">Comma separated list of media types to filter (movies,series).</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <returns></returns>
         [HttpGet("HourlyReport")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetHourlyReport(int days, DateTime? endDate, string? filter, [FromQuery] float? timezoneOffset)
+        public ActionResult GetHourlyReport(int days, DateTime? endDate, string? filter, [FromQuery] string? timezoneId)
         {
             string[] filter_tokens = Array.Empty<string>();
             if (filter != null)
@@ -385,9 +389,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 filter_tokens = filter.Split(',');
             }
 
-            endDate ??= DateTime.Now;
-
-            SortedDictionary<string, int> report = _repository.GetHourlyUsageReport(days, endDate.Value, filter_tokens, timezoneOffset ?? 0);
+            SortedDictionary<string, int> report = _repository.GetHourlyUsageReport(days, ResolveDate(endDate, timezoneId), filter_tokens, timezoneId ?? "UTC");
 
             for (int day = 0; day < 7; day++)
             {
@@ -410,13 +412,14 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// <param name="breakdownType"></param>
         /// <param name="days">Number of days.</param>
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">Activity returned.</response>
         /// <returns></returns>
         [HttpGet("{breakdownType}/BreakdownReport")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetBreakdownReport([FromRoute] string breakdownType, int days, DateTime? endDate, [FromQuery] float? timezoneOffset)
+        public ActionResult GetBreakdownReport([FromRoute] string breakdownType, int days, DateTime? endDate, [FromQuery] string? timezoneId)
         {
-            List<Dictionary<string, object>> report = _repository.GetBreakdownReport(days, endDate ?? DateTime.Now, breakdownType, timezoneOffset ?? 0);
+            List<Dictionary<string, object>> report = _repository.GetBreakdownReport(days, ResolveDate(endDate, timezoneId), breakdownType, timezoneId ?? "UTC");
 
             if (breakdownType == "UserId")
             {
@@ -448,11 +451,12 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// <param name="days">Number of Days.</param>
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
         /// <param name="filter">Comma separated list of media types to filter (movies,series).</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">Histogram returned.</response>
         /// <returns></returns>
         [HttpGet("DurationHistogramReport")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetDurationHistogramReport(int days, DateTime? endDate, string? filter)
+        public ActionResult GetDurationHistogramReport(int days, DateTime? endDate, string? filter, [FromQuery] string? timezoneId)
         {
             string[] filter_tokens = Array.Empty<string>();
             if (filter != null)
@@ -460,7 +464,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 filter_tokens = filter.Split(',');
             }
 
-            SortedDictionary<int, int> report = _repository.GetDurationHistogram(days, endDate ?? DateTime.Now, filter_tokens);
+            SortedDictionary<int, int> report = _repository.GetDurationHistogram(days, ResolveDate(endDate, timezoneId), filter_tokens, timezoneId ?? "UTC");
 
             // find max
             int max = -1;
@@ -488,12 +492,13 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// </summary>
         /// <param name="days">Number of Days.</param>
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <returns></returns>
         [HttpGet("GetTvShowsReport")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetTvShowsReport(int days, DateTime? endDate, [FromQuery] float? timezoneOffset)
+        public ActionResult GetTvShowsReport(int days, DateTime? endDate, [FromQuery] string? timezoneId)
         {
-            return Ok(_repository.GetTvShowReport(days, endDate ?? DateTime.Now, timezoneOffset ?? 0));
+            return Ok(_repository.GetTvShowReport(days, ResolveDate(endDate, timezoneId), timezoneId ?? "UTC"));
         }
 
         /// <summary>
@@ -501,13 +506,14 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
         /// </summary>
         /// <param name="days">Number of Days.</param>
         /// <param name="endDate">End date of the report in yyyy-MM-dd format.</param>
+        /// <param name="timezoneId">Optional. The timezone id to use in datetime calculations. Defaults to UTC</param>
         /// <response code="200">TV Shows returned.</response>
         /// <returns></returns>
         [HttpGet("MoviesReport")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult GetMovieReport(int days, DateTime? endDate, [FromQuery] float? timezoneOffset)
+        public ActionResult GetMovieReport(int days, DateTime? endDate, [FromQuery] string? timezoneId)
         {
-            return Ok(_repository.GetMoviesReport(days, endDate ?? DateTime.Now, timezoneOffset ?? 0));
+            return Ok(_repository.GetMoviesReport(days, ResolveDate(endDate, timezoneId), timezoneId ?? "UTC"));
         }
 
         public class CustomQueryData
@@ -603,6 +609,17 @@ namespace Jellyfin.Plugin.PlaybackReporting.Api
                 part += "s";
             }
             return part + " ";
+        }
+
+        private DateTime ResolveDate(DateTime? date, string? timezoneId)
+        {
+            if (date.HasValue)
+            {
+                return DateTime.SpecifyKind(date.Value, DateTimeKind.Unspecified);
+            }
+
+            var timezone = TimeZoneHelper.Resolve(timezoneId ?? "UTC", _logger);
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone).Date;
         }
     }
 }
