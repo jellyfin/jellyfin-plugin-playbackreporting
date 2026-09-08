@@ -27,11 +27,28 @@ const getConfigurationPageUrl = (name) => {
         });
     };
 
+    window.ApiClient.getPlaybackReportingConfiguration = function () {
+        return this.ajax({
+            type: "GET",
+            url: this.getUrl("System/Configuration/playback_reporting"),
+            dataType: "json"
+        });
+    };
+
+    window.ApiClient.updatePlaybackReportingConfiguration = function (config) {
+        return this.ajax({
+            type: "POST",
+            url: this.getUrl("System/Configuration/playback_reporting"),
+            data: JSON.stringify(config),
+            contentType: "application/json"
+        });
+    };
+
     function setBackupPathCallBack(selectedDir, view) {
-        window.ApiClient.getNamedConfiguration('playback_reporting').then(function (config) {
+        window.ApiClient.getPlaybackReportingConfiguration().then(function (config) {
             config.BackupPath = selectedDir;
             console.log("New Config Settings : " + JSON.stringify(config));
-            window.ApiClient.updateNamedConfiguration('playback_reporting', config);
+            window.ApiClient.updatePlaybackReportingConfiguration(config);
 
             var backup_path_label = view.querySelector('#backup_path_label');
             backup_path_label.innerHTML = selectedDir;
@@ -92,7 +109,7 @@ const getConfigurationPageUrl = (name) => {
             //alert("Loaded Data: " + JSON.stringify(usage_data));
             alert(responce_message[0]);
 
-            window.ApiClient.getNamedConfiguration('playback_reporting').then(function (config) {
+            window.ApiClient.getPlaybackReportingConfiguration().then(function (config) {
                 var backup_path_label = view.querySelector('#backup_path_label');
                 backup_path_label.innerHTML = config.BackupPath;
             });
@@ -166,19 +183,19 @@ const getConfigurationPageUrl = (name) => {
 
             function files_to_keep_changed() {
                 var max_files = backup_files_to_keep.value;
-                window.ApiClient.getNamedConfiguration('playback_reporting').then(function (config) {
+                window.ApiClient.getPlaybackReportingConfiguration().then(function (config) {
                     config.MaxBackupFiles = max_files;
                     console.log("New Config Settings : " + JSON.stringify(config));
-                    window.ApiClient.updateNamedConfiguration('playback_reporting', config);
+                    window.ApiClient.updatePlaybackReportingConfiguration(config);
                 });
             }
 
             function setting_changed() {
                 var max_age = max_data_age_select.value;
-                window.ApiClient.getNamedConfiguration('playback_reporting').then(function (config) {
+                window.ApiClient.getPlaybackReportingConfiguration().then(function (config) {
                     config.MaxDataAge = max_age;
                     console.log("New Config Settings : " + JSON.stringify(config));
-                    window.ApiClient.updateNamedConfiguration('playback_reporting', config);
+                    window.ApiClient.updatePlaybackReportingConfiguration(config);
                 });
             }
 
@@ -217,7 +234,7 @@ const getConfigurationPageUrl = (name) => {
 
             });
 
-            window.ApiClient.getNamedConfiguration('playback_reporting').then(function (config) {
+            window.ApiClient.getPlaybackReportingConfiguration().then(function (config) {
                 loadPage(view, config);
             });
 
