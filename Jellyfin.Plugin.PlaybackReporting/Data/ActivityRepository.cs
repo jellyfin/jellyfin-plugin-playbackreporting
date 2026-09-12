@@ -356,29 +356,65 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
 
         public void AddPlaybackAction(PlaybackInfo playInfo)
         {
+            using (WriteLock.Write())
+            {
+                using var connection = CreateConnection();
+                InsertPlaybackAction(connection, playInfo);
+            }
+        }
+
+        public bool AddPlaybackActionIfMissing(PlaybackInfo playInfo)
+        {
+            string sql_find = "select rowid from PlaybackActivity where DateCreated = @DateCreated and UserId = @UserId and ItemId = @ItemId";
+
+            using (WriteLock.Write())
+            {
+                using var connection = CreateConnection();
+                using (var statement = connection.PrepareStatement(sql_find))
+                {
+                    statement.TryBind("@DateCreated", playInfo.Date.ToDateTimeParamValue());
+                    statement.TryBind("@UserId", playInfo.UserId);
+                    statement.TryBind("@ItemId", playInfo.ItemId);
+                    bool found = false;
+                    foreach (var row in statement.ExecuteQuery())
+                    {
+                        found = true;
+                        break;
+                    }
+
+                    if (found)
+                    {
+                        return false;
+                    }
+                }
+
+                InsertPlaybackAction(connection, playInfo);
+            }
+
+            return true;
+        }
+
+        private static void InsertPlaybackAction(ManagedConnection connection, PlaybackInfo playInfo)
+        {
             string sql_add = "insert into PlaybackActivity " +
                 "(DateCreated, UserId, ItemId, ItemType, ItemName, PlaybackMethod, ClientName, DeviceName, PlayDuration) " +
                 "values " +
                 "(@DateCreated, @UserId, @ItemId, @ItemType, @ItemName, @PlaybackMethod, @ClientName, @DeviceName, @PlayDuration)";
 
-            using (WriteLock.Write())
+            connection.RunInTransaction(db =>
             {
-                using var connection = CreateConnection();
-                connection.RunInTransaction(db =>
-                {
-                    using var statement = db.PrepareStatement(sql_add);
-                    statement.TryBind("@DateCreated", playInfo.Date.ToDateTimeParamValue());
-                    statement.TryBind("@UserId", playInfo.UserId);
-                    statement.TryBind("@ItemId", playInfo.ItemId);
-                    statement.TryBind("@ItemType", playInfo.ItemType);
-                    statement.TryBind("@ItemName", playInfo.ItemName);
-                    statement.TryBind("@PlaybackMethod", playInfo.PlaybackMethod);
-                    statement.TryBind("@ClientName", playInfo.ClientName);
-                    statement.TryBind("@DeviceName", playInfo.DeviceName);
-                    statement.TryBind("@PlayDuration", playInfo.PlaybackDuration);
-                    statement.MoveNext();
-                }, TransactionMode);
-            }
+                using var statement = db.PrepareStatement(sql_add);
+                statement.TryBind("@DateCreated", playInfo.Date.ToDateTimeParamValue());
+                statement.TryBind("@UserId", playInfo.UserId);
+                statement.TryBind("@ItemId", playInfo.ItemId);
+                statement.TryBind("@ItemType", playInfo.ItemType);
+                statement.TryBind("@ItemName", playInfo.ItemName);
+                statement.TryBind("@PlaybackMethod", playInfo.PlaybackMethod);
+                statement.TryBind("@ClientName", playInfo.ClientName);
+                statement.TryBind("@DeviceName", playInfo.DeviceName);
+                statement.TryBind("@PlayDuration", playInfo.PlaybackDuration);
+                statement.MoveNext();
+            }, TransactionMode);
         }
 
         public void UpdatePlaybackAction(PlaybackInfo playInfo)

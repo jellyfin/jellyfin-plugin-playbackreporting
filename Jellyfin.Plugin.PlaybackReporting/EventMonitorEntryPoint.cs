@@ -296,7 +296,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
             _logger.LogInformation("StartPlaybackTimer : Exited");
         }
 
-        private static string GetItemName(BaseItem item)
+        internal static string GetItemName(BaseItem item)
         {
             string item_name = "Not Known";
 
