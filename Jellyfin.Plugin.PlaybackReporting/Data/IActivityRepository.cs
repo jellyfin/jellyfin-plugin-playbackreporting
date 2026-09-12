@@ -29,6 +29,7 @@ namespace Jellyfin.Plugin.PlaybackReporting.Data
         string ExportRawData();
         void DeleteOldData(DateTime? del_before);
         void AddPlaybackAction(PlaybackInfo play_info);
+        bool AddPlaybackActionIfMissing(PlaybackInfo play_info);
         void UpdatePlaybackAction(PlaybackInfo play_info);
         List<Dictionary<string, string>> GetUsageForUser(string date, string user_id, string[] filter, float timezoneOffset);
         Dictionary<String, Dictionary<string, int>> GetUsageForDays(int days, DateTime end_date, string[] types, string? data_type, float timezoneOffset);
