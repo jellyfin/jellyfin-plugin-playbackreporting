@@ -58,9 +58,27 @@ namespace Jellyfin.Plugin.PlaybackReporting
             playback_trackers = new Dictionary<string, PlaybackTracker>();
         }
 
+        /// <summary>
+        /// Builds the key used to look up a session's playback tracker.
+        /// Prefers <see cref="PlaybackProgressEventArgs.PlaySessionId"/>, which uniquely identifies a single
+        /// playback session, over the device/user/item triple: a client restarting playback of the same item
+        /// on the same device (e.g. a quick stop immediately followed by a new start) reuses the same
+        /// device/user/item triple for two distinct sessions, which previously caused the tracker for the
+        /// still-in-progress session to be mixed up with - and deleted by - the stale one's stop event.
+        /// </summary>
+        private static string GetTrackerKey(PlaybackProgressEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(e.PlaySessionId))
+            {
+                return e.PlaySessionId;
+            }
+
+            return e.DeviceId + "-" + e.Users[0].Id.ToString("N") + "-" + e.Item?.Id.ToString("N");
+        }
+
         private void SessionManager_PlaybackProgress(object? sender, PlaybackProgressEventArgs e)
         {
-            string key = e.DeviceId + "-" + e.Users[0].Id.ToString("N") + "-" + e.Item?.Id.ToString("N");
+            string key = GetTrackerKey(e);
             if (playback_trackers != null && playback_trackers.ContainsKey(key))
             {
                 try
@@ -96,7 +114,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
 
         private void SessionManager_PlaybackStop(object? sender, PlaybackStopEventArgs e)
         {
-            string key = e.DeviceId + "-" + e.Users[0].Id.ToString("N") + "-" + e.Item?.Id.ToString("N");
+            string key = GetTrackerKey(e);
             if (playback_trackers != null && playback_trackers.ContainsKey(key))
             {
                 _logger.LogInformation("Playback stop tracker found, processing stop : {Key}", key);
@@ -145,7 +163,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
                 return;
             }
 
-            string key = e.DeviceId + "-" + e.Users[0].Id.ToString("N") + "-" + e.Item?.Id.ToString("N");
+            string key = GetTrackerKey(e);
             if (playback_trackers != null && playback_trackers.ContainsKey(key))
             {
                 _logger.LogInformation("Existing tracker found! : " + key);
@@ -263,7 +281,7 @@ namespace Jellyfin.Plugin.PlaybackReporting
                         _logger.LogInformation("StartPlaybackTimer : All matches, playback registered");
 
                         // update tracker with playback info
-                        string key = e.DeviceId + "-" + e.Users[0].Id.ToString("N") + "-" + e.Item?.Id.ToString("N");
+                        string key = GetTrackerKey(e);
                         if (playback_trackers != null && playback_trackers.ContainsKey(key))
                         {
                             _logger.LogInformation("Playback tracker found, adding playback info : {Key}", key);
