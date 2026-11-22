@@ -10,6 +10,42 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Jellystics.Collectors;
 
+/// <summary>
+/// Decides which marks a UserDataSaved event represents, from Jellyfin 10.11's real sequences:
+/// PlaybackStart/Progress/Finished carry the played flag as saved (Start(Played=false) for resumable video),
+/// TogglePlayed fires for the mark button, favourites arrive as UpdateUserRating (UserFavoriteItems API) or UpdateUserData.
+/// The cache holds the last seen (played, favourite) per user and item; a cache miss on UpdateUserRating is treated
+/// as a state assertion (we cannot tell a change from a repeat), on other reasons we stay silent unless the state is positive.
+/// </summary>
+internal static class UserDataRules
+{
+    public static IEnumerable<string> Decide(UserDataSaveReason reason, bool played, bool fav, bool known, (bool Played, bool Fav) before)
+    {
+        switch (reason)
+        {
+            case UserDataSaveReason.PlaybackFinished:
+            case UserDataSaveReason.PlaybackStart:
+                if (played && (!known || !before.Played)) yield return "played";
+                break;
+            case UserDataSaveReason.TogglePlayed:
+                if (played && (!known || !before.Played)) yield return "played";
+                else if (!played && (!known || before.Played)) yield return "unplayed";
+                break;
+            case UserDataSaveReason.UpdateUserRating:
+                if (known ? fav != before.Fav : true) yield return fav ? "favorite" : "unfavorite";
+                break;
+            case UserDataSaveReason.UpdateUserData:
+                if (known)
+                {
+                    if (played && !before.Played) yield return "played";
+                    else if (!played && before.Played) yield return "unplayed";
+                    if (fav != before.Fav) yield return fav ? "favorite" : "unfavorite";
+                }
+                else if (fav) yield return "favorite";
+                break;
+        }
+    }
+}
 /// <summary>Records played / unplayed / favorite / unfavorite marks.</summary>
 public sealed class UserDataCollector : IHostedService
 {
@@ -39,23 +75,7 @@ public sealed class UserDataCollector : IHostedService
             var fav = e.UserData.IsFavorite;
             _cache[key] = (played, fav);
 
-            var kinds = new List<string>();
-            switch (e.SaveReason)
-            {
-                case UserDataSaveReason.TogglePlayed:
-                    kinds.Add(played ? "played" : "unplayed");
-                    break;
-                case UserDataSaveReason.PlaybackFinished:
-                    if (!known || !before.Played) kinds.Add("played");
-                    break;
-                case UserDataSaveReason.UpdateUserData:
-                    if (known ? fav != before.Fav : fav) kinds.Add(fav ? "favorite" : "unfavorite");
-                    break;
-                case UserDataSaveReason.Import:
-                    if (played) kinds.Add("played");
-                    break;
-            }
-
+            var kinds = UserDataRules.Decide(e.SaveReason, played, fav, known, before).ToList();
             if (kinds.Count == 0) return;
             var at = _clock.UtcNow;
             var recs = kinds.Select(k => new UserDataEventRecord
