@@ -51,7 +51,7 @@ public sealed class LibraryCollector : IHostedService
     private void OnAdded(object? sender, ItemChangeEventArgs e) => Safe(() =>
     {
         if (!IsKept(e.Item)) return;
-        var rec = ToRecord(e.Item, "added", At(e.Item));
+        var rec = ToRecord(e.Item, "added", _clock.UtcNow);   // live addition: At is when we saw it, DateCreated is Jellyfin's
         _queue.Enqueue(() => _store.UpsertLibrary(new[] { rec }));
     });
 
@@ -85,7 +85,8 @@ public sealed class LibraryCollector : IHostedService
                     OrderBy = new[] { (ItemSortBy.DateCreated, Jellyfin.Database.Implementations.Enums.SortOrder.Ascending), (ItemSortBy.SortName, Jellyfin.Database.Implementations.Enums.SortOrder.Ascending) },
                 });
                 if (page.Count == 0) break;
-                var recs = page.Where(IsKept).Select(i => ToRecord(i, "added", At(i), allRoots)).ToList();
+                var snapshotAt = _clock.UtcNow;
+                var recs = page.Where(IsKept).Select(i => ToRecord(i, "present", snapshotAt, allRoots)).ToList();
                 total += recs.Count;
                 if (!_queue.Enqueue(() =>
                 {
@@ -114,7 +115,7 @@ public sealed class LibraryCollector : IHostedService
         var id = item.Id.ToString("N");
         var rec = new LibraryEventRecord
         {
-            Id = "add-" + id, Kind = kind, At = at, ItemId = id, ItemType = item.GetBaseItemKind().ToString(), ItemName = item.Name,
+            Id = (kind == "present" ? "present-" : "add-") + id, Kind = kind, At = at, DateCreated = kind == "removed" ? null : At(item), ItemId = id, ItemType = item.GetBaseItemKind().ToString(), ItemName = item.Name,
             RunTimeTicks = item.RunTimeTicks, SizeBytes = item.Size,
             LibraryId = (allRoots is null ? _library.GetCollectionFolders(item) : _library.GetCollectionFolders(item, allRoots)).FirstOrDefault()?.Id.ToString("N"),
         };

@@ -113,7 +113,7 @@ public class SyncControllerTests
         "applicationVersion", "remoteEndPoint", "isRemote", "playMethod", "audioStreamIndex", "audioLanguage", "audioCodec", "subtitleStreamIndex",
         "subtitleLanguage", "streamChanges", "videoCodecFrom", "videoCodecTo", "audioCodecFrom", "audioCodecTo", "width", "height", "bitrate", "framerate",
         "hwAccel", "transcodeReasons", "videoRange", "isVideoDirect", "isAudioDirect", "sourceWidth", "sourceHeight", "videoRangeType", "state",
-        "lastEventAt", "source", "version",
+        "lastEventAt", "source", "durationRepaired", "version",
     };
 
     [Fact]
@@ -201,7 +201,7 @@ public class SyncControllerTests
         e.Annex.UpsertUserData(new[] { new UserDataEventRecord { Id = "u", At = T0, UserId = "u", ItemId = "i", Kind = "played", Reason = "TogglePlayed" } });
         e.Annex.UpsertLogins(new[] { new LoginRecord { Id = "l", At = T0, UserId = "u", Success = true } });
         string[] Names(IActionResult r) => Json(r).RootElement.GetProperty("items")[0].EnumerateObject().Select(p => p.Name).Order().ToArray();
-        Assert.Equal(new[] { "albumId", "at", "id", "itemId", "itemName", "itemType", "kind", "libraryId", "runTimeTicks", "seriesId", "sizeBytes", "version" }, Names(e.Controller.LibraryEvents(0, null)));
+        Assert.Equal(new[] { "albumId", "at", "dateCreated", "id", "itemId", "itemName", "itemType", "kind", "libraryId", "runTimeTicks", "seriesId", "sizeBytes", "version" }, Names(e.Controller.LibraryEvents(0, null)));
         Assert.Equal(new[] { "at", "id", "itemId", "kind", "reason", "userId", "version" }, Names(e.Controller.UserDataEvents(0, null)));
         Assert.Equal(new[] { "applicationVersion", "at", "client", "deviceId", "deviceName", "id", "remoteEndPoint", "success", "userId", "userName", "version" }, Names(e.Controller.Logins(0, null)));
     }
@@ -248,6 +248,47 @@ public class SyncControllerTests
         e.Body("{}");
         Assert.IsType<BadRequestObjectResult>(await e.Controller.ImportPlays());
         Assert.Empty(e.Plays.Since(0, 10));
+    }
+
+    [Fact]
+    public async Task ImportWithAMalformedDateIsA400Not500()
+    {
+        using var e = new Env();
+        e.Body("""{"items":[{"id":"x","userId":"u","itemId":"i","startedAt":"not-a-date"}]}""");
+        Assert.IsType<BadRequestObjectResult>(await e.Controller.ImportPlays());
+        e.Body("""{"items":[{"id":"x","userId":"u","itemId":"i","startedAt":12}]}""");
+        Assert.IsType<BadRequestObjectResult>(await e.Controller.ImportPlays());
+    }
+
+    [Fact]
+    public async Task ImportNormalisesGuidIds()
+    {
+        using var e = new Env();
+        var u = Guid.NewGuid(); var i = Guid.NewGuid();
+        e.Body($$"""{"items":[{"id":"x","userId":"{{u:D}}","itemId":"{{i:D}}","startedAt":"2026-11-20T19:00:00Z"}]}""");
+        await e.Controller.ImportPlays();
+        var p = Assert.Single(e.Plays.Since(0, 10));
+        Assert.Equal(u.ToString("N"), p.UserId);
+        Assert.Equal(i.ToString("N"), p.ItemId);
+    }
+
+    [Fact]
+    public void NewFieldsAreSerialisedCamelCase()
+    {
+        using var e = new Env();
+        e.Plays.Upsert(new[] { new PlayRecord { Id = "p", UserId = "u", ItemId = "i", StartedAt = T0, LastEventAt = T0, DurationRepaired = true }, new PlayRecord { Id = "q", UserId = "u", ItemId = "i", StartedAt = T0, LastEventAt = T0 } });
+        var plays = Json(e.Controller.Plays()).RootElement.GetProperty("items");
+        Assert.True(plays[0].GetProperty("durationRepaired").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, plays[1].GetProperty("durationRepaired").ValueKind);
+        e.Annex.UpsertLibrary(new[]
+        {
+            new LibraryEventRecord { Id = "present-i", Kind = "present", At = T0, ItemId = "i", DateCreated = T0.AddDays(-9) },
+            new LibraryEventRecord { Id = "rm-i", Kind = "removed", At = T0, ItemId = "i" },
+        });
+        var ev = Json(e.Controller.LibraryEvents()).RootElement.GetProperty("items");
+        Assert.Equal("present", ev[0].GetProperty("kind").GetString());
+        Assert.Equal("2026-11-11T19:00:00.0000000Z", ev[0].GetProperty("dateCreated").GetString());
+        Assert.Equal(JsonValueKind.Null, ev[1].GetProperty("dateCreated").ValueKind);
     }
 
     [Fact]

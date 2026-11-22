@@ -121,7 +121,7 @@ public sealed class PbrImporter
                         ParentIndexNumber = info?.ParentIndexNumber, IndexNumber = info?.IndexNumber, LibraryId = info?.LibraryId,
                         StartedAt = started, EndedAt = end, LastEventAt = end, WatchedMs = seconds * 1000,
                         Client = row.Client, DeviceName = row.Device,
-                        State = PlayStates.Closed, Source = PlaySources.ImportPbr,
+                        State = PlayStates.Closed, Source = PlaySources.ImportPbr, DurationRepaired = seconds != row.Seconds,
                     };
                     ApplyMethod(play, row.Method);
                     batch.Add(play);

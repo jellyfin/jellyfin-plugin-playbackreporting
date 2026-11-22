@@ -62,6 +62,7 @@ public sealed class PlayRecord
     public string State { get; set; } = PlayStates.Open;
     public DateTimeOffset LastEventAt { get; set; }
     public string Source { get; set; } = PlaySources.Plugin;
+    public bool? DurationRepaired { get; set; }   // import-pbr only: DurationRepair changed the duration (null for live plays)
     public long Version { get; set; }
 
     public PlayRecord Clone() => (PlayRecord)MemberwiseClone();

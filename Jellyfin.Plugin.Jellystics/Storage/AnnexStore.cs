@@ -13,6 +13,8 @@ public sealed class AnnexStore
     // ---- library ----
     public void UpsertLibrary(IReadOnlyCollection<LibraryEventRecord> events) => Write(events, (c, tx, e) =>
     {
+        // "present" (first-run snapshot) is written once per item and only if the item has no event yet (a live add may have raced the snapshot).
+        if (e.Kind == "present" && (LastKind(c, tx, e.ItemId) is not null || Exists(c, tx, "LibraryEvents", e.Id))) return false;
         // "added" events are unique per item while it stays in the library: a repeat burns no version; after a removal a new added event (timestamped id) is written.
         if (e.Kind == "added")
         {
@@ -22,11 +24,11 @@ public sealed class AnnexStore
         }
         e.Version = JellysticsDb.NextVersion(c, tx);
         Exec(c, tx,
-            "INSERT INTO LibraryEvents (Id,Kind,At,ItemId,ItemType,ItemName,SeriesId,AlbumId,LibraryId,RunTimeTicks,SizeBytes,Version) " +
-            "VALUES ($Id,$Kind,$At,$ItemId,$ItemType,$ItemName,$SeriesId,$AlbumId,$LibraryId,$RunTimeTicks,$SizeBytes,$Version) " +
-            "ON CONFLICT(Id) DO UPDATE SET Kind=excluded.Kind,At=excluded.At,ItemId=excluded.ItemId,ItemType=excluded.ItemType,ItemName=excluded.ItemName," +
+            "INSERT INTO LibraryEvents (Id,Kind,At,DateCreated,ItemId,ItemType,ItemName,SeriesId,AlbumId,LibraryId,RunTimeTicks,SizeBytes,Version) " +
+            "VALUES ($Id,$Kind,$At,$DateCreated,$ItemId,$ItemType,$ItemName,$SeriesId,$AlbumId,$LibraryId,$RunTimeTicks,$SizeBytes,$Version) " +
+            "ON CONFLICT(Id) DO UPDATE SET Kind=excluded.Kind,At=excluded.At,DateCreated=excluded.DateCreated,ItemId=excluded.ItemId,ItemType=excluded.ItemType,ItemName=excluded.ItemName," +
             "SeriesId=excluded.SeriesId,AlbumId=excluded.AlbumId,LibraryId=excluded.LibraryId,RunTimeTicks=excluded.RunTimeTicks,SizeBytes=excluded.SizeBytes,Version=excluded.Version",
-            ("$Id", e.Id), ("$Kind", e.Kind), ("$At", JellysticsDb.Iso(e.At)), ("$ItemId", e.ItemId), ("$ItemType", e.ItemType), ("$ItemName", e.ItemName),
+            ("$Id", e.Id), ("$Kind", e.Kind), ("$At", JellysticsDb.Iso(e.At)), ("$DateCreated", JellysticsDb.Iso(e.DateCreated)), ("$ItemId", e.ItemId), ("$ItemType", e.ItemType), ("$ItemName", e.ItemName),
             ("$SeriesId", e.SeriesId), ("$AlbumId", e.AlbumId), ("$LibraryId", e.LibraryId), ("$RunTimeTicks", e.RunTimeTicks), ("$SizeBytes", e.SizeBytes), ("$Version", e.Version));
         return true;
     });
@@ -58,7 +60,7 @@ public sealed class AnnexStore
 
     public IReadOnlyList<LibraryEventRecord> LibrarySince(long since, int limit) => Read("LibraryEvents", since, limit, r => new LibraryEventRecord
     {
-        Id = (string)r["Id"], Kind = (string)r["Kind"], At = JellysticsDb.ParseIso(r["At"])!.Value, ItemId = (string)r["ItemId"],
+        Id = (string)r["Id"], Kind = (string)r["Kind"], At = JellysticsDb.ParseIso(r["At"])!.Value, DateCreated = JellysticsDb.ParseIso(r["DateCreated"]), ItemId = (string)r["ItemId"],
         ItemType = S(r, "ItemType"), ItemName = S(r, "ItemName"), SeriesId = S(r, "SeriesId"), AlbumId = S(r, "AlbumId"), LibraryId = S(r, "LibraryId"),
         RunTimeTicks = L(r, "RunTimeTicks"), SizeBytes = L(r, "SizeBytes"), Version = (long)r["Version"],
     });

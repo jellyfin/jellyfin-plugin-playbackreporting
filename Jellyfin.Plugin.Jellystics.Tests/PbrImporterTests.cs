@@ -58,7 +58,8 @@ public class PbrImporterTests : IDisposable
         var r1 = importer.Import(pbr);
         Assert.Equal(new PbrImportResult(3, 3, 0, 2), r1);
         var plays = store.Since(0, 100);
-        var neg = plays.Single(p => p.Id == "pbr-1");
+        Assert.Equal(new bool?[] { true, true, false }, plays.OrderBy(p => p.Id).Select(p => p.DurationRepaired).ToArray());
+        var neg =plays.Single(p => p.Id == "pbr-1");
         Assert.Equal(0, neg.WatchedMs);
         Assert.Equal(PlaySources.ImportPbr, neg.Source);
         Assert.Equal(PlayStates.Closed, neg.State);

@@ -4,7 +4,8 @@ namespace Jellyfin.Plugin.Jellystics.Models;
 public sealed class LibraryEventRecord
 {
     public string Id { get; set; } = string.Empty;
-    public string Kind { get; set; } = "added";   // added | removed
+    public string Kind { get; set; } = "added";   // added (live) | present (first-run snapshot) | removed
+    public DateTimeOffset? DateCreated { get; set; }   // Jellyfin item DateCreated (UTC), on added/present rows
     public DateTimeOffset At { get; set; }
     public string ItemId { get; set; } = string.Empty;
     public string? ItemType { get; set; }
