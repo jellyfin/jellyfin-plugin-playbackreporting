@@ -26,7 +26,6 @@ public class AnnexStoreTests
         annex.UpsertLibrary(new[] { ev });
         annex.UpsertLibrary(new[] { ev });
         Assert.Equal(1, annex.CountLibrary());
-        Assert.True(annex.LibraryAddedExists("i"));
         Assert.Equal(1, new PlayStore(t.Db).Cursor());   // duplicate did not burn a version
     }
 
@@ -85,6 +84,27 @@ public class AnnexStoreTests
         Assert.Equal(T0, row.At);
     }
 
+    [Theory]
+    [InlineData("present-i")]
+    [InlineData("add-i")]   // id of a row migrated from v1
+    public void LiveAddSupersedesAPresentRowInPlace(string presentId)
+    {
+        using var t = new TempDb();
+        var annex = new AnnexStore(t.Db);
+        var created = T0.AddYears(-1);
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = presentId, Kind = "present", At = T0, ItemId = "i", DateCreated = created } });
+        var v1 = Assert.Single(annex.LibrarySince(0, 10)).Version;
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-i", Kind = "added", At = T0.AddDays(3), ItemId = "i", DateCreated = created } });
+        var row = Assert.Single(annex.LibrarySince(0, 10));
+        Assert.Equal(presentId, row.Id);
+        Assert.Equal("added", row.Kind);
+        Assert.Equal(T0.AddDays(3), row.At);
+        Assert.Equal(created, row.DateCreated);
+        Assert.True(row.Version > v1);
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-i", Kind = "added", At = T0.AddDays(4), ItemId = "i" } });   // already added: ignored
+        Assert.Equal(T0.AddDays(3), Assert.Single(annex.LibrarySince(0, 10)).At);
+    }
+
     [Fact]
     public void PresentIsSkippedWhenALiveAddAlreadyExists()
     {
@@ -107,19 +127,34 @@ public class AnnexStoreTests
                 using var cmd = c.CreateCommand();
                 cmd.CommandText = Migrations.Scripts[0] +
                     "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version VALUES (1);" +
-                    "UPDATE version_seq SET value = 3;" +
-                    "INSERT INTO LibraryEvents (Id,Kind,At,ItemId,Version) VALUES ('add-a','added','2026-01-01T00:00:00.0000000Z','a',1),('add-b','added','2026-01-02T00:00:00.0000000Z','b',2),('rm-a-1','removed','2026-02-01T00:00:00.0000000Z','a',3);";
+                    "UPDATE version_seq SET value = 4;" +
+                    "INSERT INTO LibraryEvents (Id,Kind,At,ItemId,Version) VALUES ('add-a','added','2026-01-01T00:00:00.0000000Z','a',1),('add-b','added','2026-01-02T00:00:00.0000000Z','b',2),('rm-a-1','removed','2026-02-01T00:00:00.0000000Z','a',3),('add-a-20260301000000','added','2026-03-01T00:00:00.0000000Z','a',4);";
                 cmd.ExecuteNonQuery();
             }
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             var db = new JellysticsDb(path);
             db.Migrate();
-            var rows = new AnnexStore(db).LibrarySince(0, 10);
-            Assert.Equal(new[] { "removed", "present", "present" }, rows.Select(r => r.Kind).ToArray());
-            var a = rows.Single(r => r.ItemId == "a" && r.Kind == "present");
+            db.Migrate();   // second run is a no-op
+            var annex = new AnnexStore(db);
+            var rows = annex.LibrarySince(0, 10);
+            // only the FIRST added row per item becomes present; the re-add row stays added (DateCreated = At)
+            Assert.Equal(new[] { "removed", "added", "present", "present" }, rows.Select(r => r.Kind).ToArray());
+            var a = rows.Single(r => r.Id == "add-a");
             Assert.Equal(a.At, a.DateCreated);
-            Assert.Equal(new long[] { 3, 4, 5 }, rows.Select(r => r.Version).ToArray());
-            Assert.Equal(5, new PlayStore(db).Cursor());
+            var readd = rows.Single(r => r.Id == "add-a-20260301000000");
+            Assert.Equal(readd.At, readd.DateCreated);
+            Assert.Equal(4, rows.Count);
+            Assert.Equal(6,new PlayStore(db).Cursor());
+            Assert.Equal(rows.Select(r => r.Version).Distinct().Count(), rows.Count);
+            // Plays.DurationRepaired exists after migration
+            new PlayStore(db).Upsert(new[] { new PlayRecord { Id = "p", UserId = "u", ItemId = "i", StartedAt = T0, LastEventAt = T0, DurationRepaired = false } });
+            Assert.False(new PlayStore(db).Get("p")!.DurationRepaired);
+            // a re-add after a removal on a migrated database writes a new added row
+            annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-a", Kind = "added", At = T0, ItemId = "a" } });
+            annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "rm-a-2", Kind = "removed", At = T0.AddDays(1), ItemId = "a" } });
+            annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-a", Kind = "added", At = T0.AddDays(2), ItemId = "a" } });
+            Assert.Equal("added", annex.LibrarySince(0, 20).Last().Kind);
+            Assert.Equal(T0.AddDays(2), annex.LibrarySince(0, 20).Last().At);
         }
         finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(path); }
     }

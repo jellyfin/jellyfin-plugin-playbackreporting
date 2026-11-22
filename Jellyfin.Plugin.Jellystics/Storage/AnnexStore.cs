@@ -14,12 +14,14 @@ public sealed class AnnexStore
     public void UpsertLibrary(IReadOnlyCollection<LibraryEventRecord> events) => Write(events, (c, tx, e) =>
     {
         // "present" (first-run snapshot) is written once per item and only if the item has no event yet (a live add may have raced the snapshot).
-        if (e.Kind == "present" && (LastKind(c, tx, e.ItemId) is not null || Exists(c, tx, "LibraryEvents", e.Id))) return false;
+        if (e.Kind == "present" && (LastEvent(c, tx, e.ItemId) is not null || Exists(c, tx, "LibraryEvents", e.Id))) return false;
         // "added" events are unique per item while it stays in the library: a repeat burns no version; after a removal a new added event (timestamped id) is written.
+        // A live add after a snapshot "present" row supersedes it in place (same id, new Version) so the consumer overwrites it by id.
         if (e.Kind == "added")
         {
-            var last = LastKind(c, tx, e.ItemId);
-            if (last == "removed") e.Id = $"add-{e.ItemId}-{e.At.UtcDateTime:yyyyMMddHHmmss}";
+            var last = LastEvent(c, tx, e.ItemId);
+            if (last?.Kind == "removed") e.Id = $"add-{e.ItemId}-{e.At.UtcDateTime:yyyyMMddHHmmss}";
+            else if (last?.Kind == "present") e.Id = last.Value.Id;
             else if (last is not null || Exists(c, tx, "LibraryEvents", e.Id)) return false;
         }
         e.Version = JellysticsDb.NextVersion(c, tx);
@@ -32,12 +34,6 @@ public sealed class AnnexStore
             ("$SeriesId", e.SeriesId), ("$AlbumId", e.AlbumId), ("$LibraryId", e.LibraryId), ("$RunTimeTicks", e.RunTimeTicks), ("$SizeBytes", e.SizeBytes), ("$Version", e.Version));
         return true;
     });
-
-    public bool LibraryAddedExists(string itemId)
-    {
-        using var c = _db.Open();
-        return Exists(c, null, "LibraryEvents", "add-" + itemId);
-    }
 
     public long CountLibrary()
     {
@@ -124,13 +120,15 @@ public sealed class AnnexStore
     }
 
     // ---- helpers ----
-    private static string? LastKind(SqliteConnection c, SqliteTransaction? tx, string itemId)
+    /// <summary>Latest event of an item by time (not Version: migration v2 re-versions old rows).</summary>
+    private static (string Id, string Kind)? LastEvent(SqliteConnection c, SqliteTransaction? tx, string itemId)
     {
         using var cmd = c.CreateCommand();
         cmd.Transaction = tx;
-        cmd.CommandText = "SELECT Kind FROM LibraryEvents WHERE ItemId = $i ORDER BY Version DESC LIMIT 1";
+        cmd.CommandText = "SELECT Id, Kind FROM LibraryEvents WHERE ItemId = $i ORDER BY At DESC, Version DESC LIMIT 1";
         cmd.Parameters.AddWithValue("$i", itemId);
-        return cmd.ExecuteScalar() as string;
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? (r.GetString(0), r.GetString(1)) : null;
     }
 
     private void Write<T>(IReadOnlyCollection<T> rows, Func<SqliteConnection, SqliteTransaction, T, bool> write)

@@ -31,4 +31,4 @@ Requires the Nix dev shell (`nix develop`, or direnv): dotnet 9, go-task, docker
    `sqlite3 config/plugins/Jellyfin.Plugin.Jellystics/jellystics.db "select WatchedMs, PausedMs, PauseCount, SeekCount, SkippedMs, State from Plays"`
    (on macOS, read the db after `docker stop`/`docker restart`, or copy `jellystics.db*` first: the WAL of a running container is not visible through the bind mount) expect about `90000 | 30000 | 1 | 1 | ~120000 | closed`.
 4. Restart the container mid-play: the play is closed at its last checkpoint.
-5. Dashboard > Plugins > Jellystics: import a copied `playback_reporting.db` and check the counts.
+5. Dashboard > Plugins > Jellystics: import a copied `playback_reporting.db` and check the counts. Re-running the import is safe and also fills `durationRepaired` on rows imported by an earlier plugin version.

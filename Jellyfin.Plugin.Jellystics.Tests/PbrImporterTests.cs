@@ -94,6 +94,43 @@ public class PbrImporterTests : IDisposable
         Assert.Single(store.Since(0, 100));
     }
 
+    [Fact]
+    public void ReimportFillsMissingDurationRepairedWithoutTouchingOtherColumns()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var pbr = Pbr(
+            ("2026-07-20 18:55:23.8036003", "u1", "ep1", "Episode", "Ep", "DirectPlay", 166552),
+            ("2026-08-01 21:00:20.0000000", "u1", "ep1", "Episode", "Ep", "DirectPlay", 600));
+        var importer = new PbrImporter(store, new FakeItems(), TimeZoneInfo.Utc);
+        importer.Import(pbr);
+        using (var c = new SqliteConnection($"Data Source={t.Path}"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE Plays SET DurationRepaired = NULL";   // pre-v2 rows
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+        var before = store.Since(0, 10);
+        var r = importer.Import(pbr);
+        Assert.Equal(0, r.Imported);
+        var after = store.Since(0, 10);
+        Assert.Equal(2, after.Count);
+        Assert.True(after.Single(p => p.Id == "pbr-1").DurationRepaired);
+        Assert.False(after.Single(p => p.Id == "pbr-2").DurationRepaired);
+        foreach (var a in after)
+        {
+            var b = before.Single(x => x.Id == a.Id);
+            Assert.True(a.Version > b.Version);
+            Assert.Equal(b.WatchedMs, a.WatchedMs);
+            Assert.Equal(b.StartedAt, a.StartedAt);
+            Assert.Equal(b.ItemName, a.ItemName);
+        }
+        var cursor = store.Cursor();
+        importer.Import(pbr);   // flag now set: nothing more to touch
+        Assert.Equal(cursor, store.Cursor());
+    }
+
     private static PlayRecord Only(PlayStore s) => Assert.Single(s.Since(0, 100));
 
     [Fact]

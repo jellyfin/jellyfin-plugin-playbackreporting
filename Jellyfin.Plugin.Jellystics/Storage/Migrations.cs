@@ -45,8 +45,10 @@ internal static class Migrations
         """
         ALTER TABLE LibraryEvents ADD COLUMN DateCreated TEXT;
         ALTER TABLE Plays ADD COLUMN DurationRepaired INTEGER;
-        CREATE TEMP TABLE _remap AS SELECT Id, ROW_NUMBER() OVER (ORDER BY Version) AS n FROM LibraryEvents WHERE Kind = 'added';
-        UPDATE LibraryEvents SET Kind = 'present', DateCreated = At,
+        UPDATE LibraryEvents SET DateCreated = At WHERE Kind = 'added';   -- re-add rows after a removal keep "added" but get a DateCreated
+        CREATE TEMP TABLE _remap AS SELECT Id, ROW_NUMBER() OVER (ORDER BY Version) AS n FROM LibraryEvents l
+          WHERE Kind = 'added' AND Version = (SELECT MIN(Version) FROM LibraryEvents l2 WHERE l2.ItemId = l.ItemId AND l2.Kind = 'added');   -- only the first add per item is the snapshot-era row
+        UPDATE LibraryEvents SET Kind = 'present',
           Version = (SELECT value FROM version_seq) + (SELECT n FROM _remap WHERE _remap.Id = LibraryEvents.Id)
           WHERE Id IN (SELECT Id FROM _remap);
         UPDATE version_seq SET value = value + (SELECT COUNT(*) FROM _remap);

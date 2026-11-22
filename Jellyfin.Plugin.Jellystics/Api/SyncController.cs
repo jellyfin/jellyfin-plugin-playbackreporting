@@ -80,8 +80,8 @@ public class SyncController : ControllerBase
                 {
                     if (p is null || string.IsNullOrWhiteSpace(p.Id) || string.IsNullOrWhiteSpace(p.UserId) || string.IsNullOrWhiteSpace(p.ItemId) || p.StartedAt == default) { rejected++; continue; }
                     if (!seen.Add(p.Id) || _plays.Get(p.Id) is not null) { skipped++; continue; }
-                    if (Guid.TryParse(p.UserId, out var uid)) p.UserId = uid.ToString("N");
-                    if (Guid.TryParse(p.ItemId, out var iid)) p.ItemId = iid.ToString("N");
+                    IdNormalizer.Normalize(p);
+                    // DurationRepaired is stored as sent: only import-pbr rows are computed by the plugin.
                     p.Source = PlaySources.ImportJellystics;
                     p.State = PlayStates.Closed;
                     if (p.LastEventAt == default) p.LastEventAt = p.EndedAt ?? p.StartedAt;

@@ -95,13 +95,24 @@ public sealed class PbrImporter
             if (chunk.Count == 0) return;
             // One IN query for the whole chunk: re-imports leave existing rows alone (an upsert would bump their Version and make sync consumers re-read them).
             var existing = _store.ExistingIds(chunk.Select(x => "pbr-" + x.RowId));
+            var unflagged = _store.IdsWithoutRepairFlag(existing);   // rows imported before schema v2: fill the flag only
+            var flags = new Dictionary<string, bool>();
             var batch = new List<PlayRecord>(chunk.Count);
             foreach (var row in chunk)
             {
                 try
                 {
                     var id = "pbr-" + row.RowId;
-                    if (existing.Contains(id)) { skipped++; continue; }
+                    if (existing.Contains(id))
+                    {
+                        if (unflagged.Contains(id))
+                        {
+                            var known = NormalizeId(row.Item);
+                            if (!cache.TryGetValue(known, out var knownInfo)) cache[known] = knownInfo = _items.Find(known);
+                            flags[id] = DurationRepair.RepairSeconds(row.Seconds, knownInfo?.RunTimeTicks) != row.Seconds;
+                        }
+                        skipped++; continue;
+                    }
                     var userId = NormalizeId(row.User);
                     var itemId = NormalizeId(row.Item);
                     var started = ParseStart(row.Date ?? throw new FormatException("no date")).AddSeconds(-20);
@@ -133,11 +144,12 @@ public sealed class PbrImporter
                 }
             }
             _store.Upsert(batch);
+            _store.SetDurationRepaired(flags);
             chunk.Clear();
         }
     }
 
-    private static string NormalizeId(string id) => Guid.TryParse(id, out var g) ? g.ToString("N") : id;
+    private static string NormalizeId(string id) => IdNormalizer.Normalize(id)!;
 
     /// <summary>PBR stores <c>DateTime.Now</c> of the server (local, "yyyy-MM-dd HH:mm:ss.FFFFFFF"); values carrying an offset or Z are converted directly.</summary>
     private DateTimeOffset ParseStart(string value)

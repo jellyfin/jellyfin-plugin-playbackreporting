@@ -260,16 +260,29 @@ public class SyncControllerTests
         Assert.IsType<BadRequestObjectResult>(await e.Controller.ImportPlays());
     }
 
-    [Fact]
-    public async Task ImportNormalisesGuidIds()
+    [Theory]
+    [InlineData("""{"items":[{"id":"x","userId":"u","itemId":"i","startedAt":"2026-11-20T19:00:00Z","endedAt":"nope"}]}""")]
+    [InlineData("""{"items":[{"id":"x","userId":"u","itemId":"i","startedAt":"2026-11-20T19:00:00Z","lastEventAt":"31/31/2026"}]}""")]
+    [InlineData("""{"items":[{"id":"x","userId":"u","itemId":"i","startedAt":null}]}""")]
+    [InlineData("""{"items":[{"id":"ok","userId":"u","itemId":"i","startedAt":"2026-11-20T19:00:00Z"},{"id":"x","userId":"u","itemId":"i","startedAt":"garbage"}]}""")]
+    public async Task ImportWithOtherBadDatesIsA400AndImportsNothing(string body)
     {
         using var e = new Env();
-        var u = Guid.NewGuid(); var i = Guid.NewGuid();
-        e.Body($$"""{"items":[{"id":"x","userId":"{{u:D}}","itemId":"{{i:D}}","startedAt":"2026-11-20T19:00:00Z"}]}""");
+        e.Body(body);
+        Assert.IsType<BadRequestObjectResult>(await e.Controller.ImportPlays());
+        Assert.Empty(e.Plays.Since(0, 10));
+    }
+
+    [Fact]
+    public async Task ImportNormalisesEveryIdField()
+    {
+        using var e = new Env();
+        var g = Enumerable.Range(0, 7).Select(_ => Guid.NewGuid()).ToArray();
+        e.Body($$"""{"items":[{"id":"x","userId":"{{g[0]:D}}","itemId":"{{g[1]:D}}","seriesId":"{{g[2]:B}}","seasonId":"{{g[3]:D}}","albumId":"{{g[4]:D}}","libraryId":"{{g[5]:D}}","mediaSourceId":"{{g[6]:D}}","startedAt":"2026-11-20T19:00:00Z","durationRepaired":true}]}""");
         await e.Controller.ImportPlays();
         var p = Assert.Single(e.Plays.Since(0, 10));
-        Assert.Equal(u.ToString("N"), p.UserId);
-        Assert.Equal(i.ToString("N"), p.ItemId);
+        Assert.Equal(new[] { p.UserId, p.ItemId, p.SeriesId, p.SeasonId, p.AlbumId, p.LibraryId, p.MediaSourceId }, g.Select(x => x.ToString("N")).ToArray());
+        Assert.True(p.DurationRepaired);   // stored as sent on import-jellystics rows
     }
 
     [Fact]

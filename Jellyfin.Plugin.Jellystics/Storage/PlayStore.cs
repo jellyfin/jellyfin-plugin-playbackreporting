@@ -66,6 +66,41 @@ public sealed class PlayStore
     }
 
     /// <summary>Which of the given ids exist, in chunks of 500 (one IN query per chunk).</summary>
+    /// <summary>Of the given ids, those whose DurationRepaired is still NULL (rows written before schema v2).</summary>
+    public HashSet<string> IdsWithoutRepairFlag(IEnumerable<string> ids)
+    {
+        var found = new HashSet<string>();
+        using var c = _db.Open();
+        foreach (var chunk in ids.Distinct().Chunk(500))
+        {
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = $"SELECT Id FROM Plays WHERE DurationRepaired IS NULL AND Id IN ({string.Join(",", chunk.Select((_, i) => "$p" + i))})";
+            for (var i = 0; i < chunk.Length; i++) cmd.Parameters.AddWithValue("$p" + i, chunk[i]);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) found.Add(r.GetString(0));
+        }
+        return found;
+    }
+
+    /// <summary>Sets DurationRepaired on existing rows without touching any other column (new Version so sync consumers re-read them).</summary>
+    public void SetDurationRepaired(IReadOnlyDictionary<string, bool> flags)
+    {
+        if (flags.Count == 0) return;
+        using var c = _db.Open();
+        using var tx = c.BeginTransaction();
+        foreach (var (id, flag) in flags)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE Plays SET DurationRepaired = $f, Version = $v WHERE Id = $id AND DurationRepaired IS NULL";
+            cmd.Parameters.AddWithValue("$f", flag ? 1 : 0);
+            cmd.Parameters.AddWithValue("$v", JellysticsDb.NextVersion(c, tx));
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
     public HashSet<string> ExistingIds(IEnumerable<string> ids)
     {
         var found = new HashSet<string>();
