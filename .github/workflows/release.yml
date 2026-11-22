@@ -1,0 +1,78 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Get version from tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          # Jellyfin wants four numeric parts
+          case "$TAG" in
+            *.*.*.*) VERSION="$TAG" ;;
+            *) VERSION="$TAG.0" ;;
+          esac
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Set version
+        run: |
+          sed -i "s#<Version>.*</Version>#<Version>${VERSION}</Version>#; s#<AssemblyVersion>.*</AssemblyVersion>#<AssemblyVersion>${VERSION}</AssemblyVersion>#; s#<FileVersion>.*</FileVersion>#<FileVersion>${VERSION}</FileVersion>#" Directory.Build.props
+
+      - name: Build
+        run: dotnet build Jellyfin.Plugin.Jellystics/Jellyfin.Plugin.Jellystics.csproj --configuration Release
+
+      - name: Zip artifact (dll only)
+        run: |
+          ZIP="Jellyfin.Plugin.Jellystics-v${VERSION}.zip"
+          (cd Jellyfin.Plugin.Jellystics/bin/Release/net9.0 && zip "$GITHUB_WORKSPACE/$ZIP" Jellyfin.Plugin.Jellystics.dll)
+          echo "ZIP=$ZIP" >> $GITHUB_ENV
+          echo "MD5=$(md5sum "$ZIP" | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: Update and commit manifest.json
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch origin
+          git checkout -B master origin/master
+
+          cat <<EOF > new_version.json
+          {
+            "checksum": "${MD5}",
+            "version": "${VERSION}",
+            "targetAbi": "10.11.0.0",
+            "sourceUrl": "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${ZIP}",
+            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "changelog": "- New release v${VERSION}"
+          }
+          EOF
+
+          jq '.[0].versions = ([input] + .[0].versions)' manifest.json new_version.json > manifest.tmp && mv manifest.tmp manifest.json
+          rm new_version.json
+
+          git add manifest.json
+          git commit -m "chore: update manifest for v${VERSION}"
+          git push origin master
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP }}
+          name: v${{ env.VERSION }}
+          draft: false
+          prerelease: false

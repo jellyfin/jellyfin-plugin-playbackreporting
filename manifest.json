@@ -1,0 +1,12 @@
+[
+  {
+    "category": "General",
+    "guid": "7f3c2a1e-9b84-4d6f-a2c5-3e1b8d9f6a40",
+    "name": "Jellystics",
+    "owner": "Jellystics",
+    "overview": "Precise playback collector and backup for Jellystics",
+    "description": "Records every playback from Jellyfin events (real watch time, pauses, seeks, tracks, transcoding) and keeps a full history that Jellystics syncs from.",
+    "imageUrl": "",
+    "versions": []
+  }
+]

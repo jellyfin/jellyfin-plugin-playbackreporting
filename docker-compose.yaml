@@ -1,0 +1,10 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:10.11.5
+    container_name: jellystics-plugin-jellyfin
+    volumes:
+      - ./config:/config
+      - ./media:/media:ro
+    ports:
+      - 8097:8096
+    restart: unless-stopped

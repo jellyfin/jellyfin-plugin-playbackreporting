@@ -1,0 +1,30 @@
+version: "3"
+
+vars:
+  PLUGIN_DIR: config/plugins/Jellystics
+
+tasks:
+  build:
+    desc: Build the plugin and deploy it to the dev Jellyfin
+    cmds:
+      - dotnet build Jellyfin.Plugin.Jellystics/Jellyfin.Plugin.Jellystics.csproj -c Debug
+      - rm -rf {{.PLUGIN_DIR}}
+      - mkdir -p {{.PLUGIN_DIR}}
+      - cp -f Jellyfin.Plugin.Jellystics/bin/Debug/net9.0/Jellyfin.Plugin.Jellystics.dll {{.PLUGIN_DIR}}/
+      - docker restart jellystics-plugin-jellyfin
+
+  test:
+    desc: Run the unit tests
+    cmds:
+      - dotnet test
+
+  clean:
+    desc: Remove build output and the deployed plugin
+    cmds:
+      - rm -rf Jellyfin.Plugin.Jellystics/bin Jellyfin.Plugin.Jellystics/obj Jellyfin.Plugin.Jellystics.Tests/bin Jellyfin.Plugin.Jellystics.Tests/obj
+      - rm -rf {{.PLUGIN_DIR}}
+
+  logs:
+    desc: Follow the dev Jellyfin logs
+    cmds:
+      - docker logs -f jellystics-plugin-jellyfin

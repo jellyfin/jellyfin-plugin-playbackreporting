@@ -227,3 +227,6 @@ artifacts
 
 # Planning docs (local only)
 docs/superpowers/
+
+config/
+media/
