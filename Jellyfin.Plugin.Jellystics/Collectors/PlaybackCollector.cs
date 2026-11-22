@@ -35,8 +35,8 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
         _sessions.PlaybackStart += OnStart;
         _sessions.PlaybackProgress += OnProgress;
         _sessions.PlaybackStopped += OnStopped;
-        _checkpoint = new Timer(_ => Persist(_registry.TakeDirtyOpen()), null, CheckpointEvery, CheckpointEvery);
-        _sweep = new Timer(_ => Persist(_registry.Sweep()), null, SweepEvery, SweepEvery);
+        _checkpoint = new Timer(_ => Guarded("checkpoint", () => Persist(_registry.TakeDirtyOpen())), null, CheckpointEvery, CheckpointEvery);
+        _sweep = new Timer(_ => Guarded("sweep", () => Persist(_registry.Sweep())), null, SweepEvery, SweepEvery);
         return Task.CompletedTask;
     }
 
@@ -52,6 +52,20 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
 
     public void Dispose() { _checkpoint?.Dispose(); _sweep?.Dispose(); }
 
+    /// <summary>
+    /// Which events become plays. Deliberate deviation from spec 4.2 (which accepted them): automated progress events are dropped,
+    /// they are server generated and would credit time that was not watched. Extras (trailers, theme media) are never plays.
+    /// </summary>
+    internal static bool ShouldTrack(PlaybackProgressEventArgs e) =>
+        e.Item is not null && e.Users.Count > 0 && !e.IsAutomated && e.Item.ExtraType is null && !e.Item.IsThemeMedia;
+
+    private void Guarded(string what, Action a)
+    {
+        try { a(); } catch (Exception ex) { _logger.LogError(ex, "Jellystics {What} failed", what); }
+    }
+
+    // Start and Stop are raised from thread-pool tasks by SessionManager while Progress is synchronous: ordering between them is not
+    // guaranteed, hence the registry stamps events under its lock and ignores late events for plays it just closed.
     private void OnStart(object? sender, PlaybackProgressEventArgs e) => Handle(e, PlayEventKind.Start, null);
     private void OnProgress(object? sender, PlaybackProgressEventArgs e) => Handle(e, PlayEventKind.Progress, null);
     private void OnStopped(object? sender, PlaybackStopEventArgs e) => Handle(e, PlayEventKind.Stop, e.PlayedToCompletion);
@@ -60,13 +74,19 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
     {
         try
         {
-            if (e.Item is null || e.Users.Count == 0 || e.Item.IsThemeMedia) return;
-            var key = PlayRecordFactory.Key(e);
+            if (!ShouldTrack(e)) return;
+            var deviceUser = PlayRecordFactory.DeviceUserKey(e);
+            // Some Stop events lack the PlaySessionId: fall back to the open play of the same device, user and item.
+            var key = kind == PlayEventKind.Start ? PlayRecordFactory.Key(e) : _registry.ResolveKey(PlayRecordFactory.Key(e), deviceUser, e.Item!.Id.ToString("N"));
             // Library / media-stream lookups happen here, outside the registry lock.
             PlayRecord? record = kind == PlayEventKind.Stop ? null : (kind == PlayEventKind.Start || !_registry.IsOpen(key) ? _factory.Create(e) : null);
             var ev = _factory.ToEvent(e, kind, default, done);   // At is stamped by the registry, inside its lock
-            var closed = _registry.OnEventNow(key, PlayRecordFactory.DeviceUserKey(e), () => record ??= _factory.Create(e), ev);
-            if (kind == PlayEventKind.Progress) _registry.Mutate(key, r => _factory.ApplyTranscoding(r, e.Session));
+            var closed = _registry.OnEventNow(key, deviceUser, () => record ??= _factory.Create(e), ev);
+            if (kind == PlayEventKind.Progress)
+            {
+                var update = _factory.PrepareTranscodeUpdate(e);   // stream lookups happen here, outside the registry lock
+                _registry.Mutate(key, update);
+            }
             Persist(closed);
         }
         catch (Exception ex)
@@ -78,6 +98,7 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
     private void Persist(IReadOnlyList<PlayRecord> plays)
     {
         if (plays.Count == 0) return;
+        foreach (var p in plays) _factory.FinalizeClosed(p);
         _queue.Enqueue(() => _store.Upsert(plays));
     }
 }

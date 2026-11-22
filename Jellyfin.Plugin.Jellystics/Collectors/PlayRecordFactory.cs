@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Jellystics.Models;
@@ -17,6 +18,8 @@ public sealed class PlayRecordFactory
 {
     private readonly ILibraryManager _library;
     private readonly IMediaSourceManager _mediaSources;
+    // Media streams of the items being played: queried once, evicted when the play closes (FinalizeClosed).
+    private readonly ConcurrentDictionary<Guid, IReadOnlyList<MediaStream>> _streams = new();
 
     public PlayRecordFactory(ILibraryManager library, IMediaSourceManager mediaSources)
     {
@@ -56,13 +59,9 @@ public sealed class PlayRecordFactory
             IsRemote = NetworkClassifier.IsRemote(e.Session?.RemoteEndPoint),
             PlayMethod = e.Session?.PlayState?.PlayMethod?.ToString(),
         };
-        if (item is Episode ep) { r.SeriesId = ep.SeriesId.ToString("N"); r.SeriesName = ep.SeriesName; r.SeasonId = ep.SeasonId.ToString("N"); }
-        if (item is Audio au) { r.AlbumId = au.AlbumEntity?.Id.ToString("N"); r.AlbumName = au.Album; }
-        var streams = Streams(item.Id);
-        var video = streams.FirstOrDefault(s => s.Type == MediaStreamType.Video);
-        r.VideoCodecFrom = video?.Codec;
-        r.VideoRange = video?.VideoRange.ToString();
-        ApplyTranscoding(r, e.Session, streams);
+        if (item is Episode ep) { r.SeriesId = N(ep.SeriesId); r.SeriesName = ep.SeriesName; r.SeasonId = N(ep.SeasonId); }
+        if (item is Audio au) { r.AlbumId = au.AlbumEntity is { } album ? N(album.Id) : null; r.AlbumName = au.Album; }
+        PrepareTranscodeUpdate(e)(r);
         return r;
     }
 
@@ -79,28 +78,70 @@ public sealed class PlayRecordFactory
             playedToCompletion);
     }
 
-    public void ApplyTranscoding(PlayRecord r, SessionInfo? s, IReadOnlyList<MediaStream>? streams = null)
+    private static string? N(Guid id) => id == Guid.Empty ? null : id.ToString("N");
+
+    /// <summary>
+    /// Computes (outside any lock, from the cached media streams) everything derived from the session / transcoding info,
+    /// and returns the plain assignments to run on the record (inside <c>PlaySessionRegistry.Mutate</c> for open plays).
+    /// </summary>
+    public Action<PlayRecord> PrepareTranscodeUpdate(PlaybackProgressEventArgs e)
     {
-        r.PlayMethod = s?.PlayState?.PlayMethod?.ToString() ?? r.PlayMethod;
+        var s = e.Session;
+        var streams = e.Item is null ? Array.Empty<MediaStream>() : Streams(e.Item.Id);
+        var video = streams.FirstOrDefault(x => x.Type == MediaStreamType.Video);
         var audioIdx = s?.PlayState?.AudioStreamIndex;
-        streams ??= Streams(Guid.Parse(r.ItemId));
-        r.AudioCodecFrom = streams.FirstOrDefault(x => x.Index == audioIdx)?.Codec ?? streams.FirstOrDefault(x => x.Type == MediaStreamType.Audio)?.Codec;
-        r.AudioCodec = r.AudioCodecFrom;
+        var audioFrom = (streams.FirstOrDefault(x => x.Index == audioIdx && x.Type == MediaStreamType.Audio) ?? streams.FirstOrDefault(x => x.Type == MediaStreamType.Audio))?.Codec;
+        var method = s?.PlayState?.PlayMethod?.ToString();
+        var range = video is null || video.VideoRange == VideoRange.Unknown ? null : video.VideoRange.ToString();
+        var rangeType = video is null || video.VideoRangeType == VideoRangeType.Unknown ? null : video.VideoRangeType.ToString();
         var t = s?.TranscodingInfo;
-        if (t is null) return;
-        r.VideoCodecTo = t.IsVideoDirect ? r.VideoCodecFrom : t.VideoCodec;
-        r.AudioCodecTo = t.IsAudioDirect ? r.AudioCodecFrom : t.AudioCodec;
-        r.Width = t.Width;
-        r.Height = t.Height;
-        r.Bitrate = t.Bitrate;
-        r.Framerate = t.Framerate;
-        r.HwAccel = t.HardwareAccelerationType?.ToString();
-        r.TranscodeReasons = JsonSerializer.Serialize(Enum.GetValues<TranscodeReason>().Where(x => x != 0 && t.TranscodeReasons.HasFlag(x)).Select(x => x.ToString()));
+        string? reasons = null, hw = null;
+        if (t is not null)
+        {
+            reasons = JsonSerializer.Serialize(Enum.GetValues<TranscodeReason>().Where(x => x != 0 && t.TranscodeReasons.HasFlag(x)).Select(x => x.ToString()));
+            hw = t.HardwareAccelerationType is null or HardwareAccelerationType.none ? null : t.HardwareAccelerationType.ToString();
+        }
+
+        return r =>
+        {
+            r.PlayMethod = method ?? r.PlayMethod;
+            r.VideoCodecFrom = video?.Codec;
+            r.VideoRange = range;
+            r.VideoRangeType = rangeType;
+            r.SourceWidth = video?.Width;
+            r.SourceHeight = video?.Height;
+            r.AudioCodecFrom = audioFrom;
+            r.AudioCodec = audioFrom;
+            if (t is null) return;
+            r.IsVideoDirect = t.IsVideoDirect;
+            r.IsAudioDirect = t.IsAudioDirect;
+            r.VideoCodecTo = t.IsVideoDirect ? video?.Codec : t.VideoCodec;
+            r.AudioCodecTo = t.IsAudioDirect ? audioFrom : t.AudioCodec;
+            r.Width = t.Width;
+            r.Height = t.Height;
+            r.Bitrate = t.Bitrate;
+            r.Framerate = t.Framerate;
+            r.HwAccel = hw;
+            r.TranscodeReasons = reasons;
+        };
     }
 
-    private IReadOnlyList<MediaStream> Streams(Guid itemId)
+    /// <summary>On a closed play: the audio codec follows the dominant track chosen by the tracker; frees the cached streams of the item.</summary>
+    public void FinalizeClosed(PlayRecord r)
     {
-        try { return _mediaSources.GetMediaStreams(itemId); }
-        catch (ArgumentException) { return Array.Empty<MediaStream>(); }
+        if (r.State != PlayStates.Closed || !Guid.TryParse(r.ItemId, out var itemId)) return;
+        if (r.AudioStreamIndex is { } idx && Streams(itemId).FirstOrDefault(x => x.Index == idx && x.Type == MediaStreamType.Audio) is { } a)
+        {
+            r.AudioCodecFrom = a.Codec;
+            r.AudioCodec = a.Codec;
+            if (r.IsAudioDirect == true) r.AudioCodecTo = a.Codec;
+        }
+        _streams.TryRemove(itemId, out _);
     }
+
+    private IReadOnlyList<MediaStream> Streams(Guid itemId) => _streams.GetOrAdd(itemId, id =>
+    {
+        try { return _mediaSources.GetMediaStreams(id); }
+        catch (ArgumentException) { return Array.Empty<MediaStream>(); }
+    });
 }

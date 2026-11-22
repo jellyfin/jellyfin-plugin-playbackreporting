@@ -66,7 +66,8 @@ public sealed class PlayTracker
         // Clients often pause right before stopping: that is not a user pause.
         if (IsPlaying && e.IsPaused && e.Kind != PlayEventKind.Stop) Record.PauseCount++;
         IsPlaying = !e.IsPaused;
-        TrackStreams(e with { At = at });
+        // Jellyfin clears the play state indexes (RemoveNowPlayingItem) before raising PlaybackStopped: a Stop carries no stream info.
+        if (e.Kind != PlayEventKind.Stop) TrackStreams(e with { At = at });
 
         if (e.PositionTicks is not null) { Record.PositionEndTicks = e.PositionTicks; _lastPos = e.PositionTicks; _lastPosAt = at; }
         Record.LastEventAt = at;

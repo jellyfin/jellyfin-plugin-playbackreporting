@@ -91,7 +91,7 @@ public sealed class PlaySessionRegistry
                     v.Tracker.CloseAt(v.Tracker.Record.LastEventAt);
                     closed.Add(v.Tracker.Snapshot());
                     _open.Remove(k);
-                    _recentlyClosed[k] = now;
+                    // Not remembered as recently closed: a client resuming after silence starts a new play right away.
                 }
             }
             return closed;
@@ -106,6 +106,17 @@ public sealed class PlaySessionRegistry
             if (!_open.TryGetValue(key, out var v)) return;
             change(v.Tracker.Record);
             v.Tracker.Touch();
+        }
+    }
+
+    /// <summary>Maps an event key to the open play it belongs to: some Stop events lack the PlaySessionId, so fall back to the open play of the same device, user and item.</summary>
+    public string ResolveKey(string key, string deviceUserKey, string itemId)
+    {
+        lock (_lock)
+        {
+            if (_open.ContainsKey(key)) return key;
+            foreach (var (k, v) in _open) if (v.DeviceUser == deviceUserKey && v.Tracker.Record.ItemId == itemId) return k;
+            return key;
         }
     }
 

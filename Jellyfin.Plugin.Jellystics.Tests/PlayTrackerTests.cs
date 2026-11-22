@@ -197,4 +197,17 @@ public class PlayTrackerTests
         t.Apply(new PlayEvent(At(20), PlayEventKind.Progress, Pos(200), false, IsAutomated: true));
         Assert.Equal(0, t.Record.SeekCount);
     }
+
+    [Fact]
+    public void StopWithoutStreamIndexesKeepsTheSubtitleAndRecordsNoChange()
+    {
+        var t = new PlayTracker(new PlayRecord { Id = "p", UserId = "u", ItemId = "i" },
+            new PlayEvent(At(0), PlayEventKind.Start, 0, false, AudioStreamIndex: 1, AudioLanguage: "eng", SubtitleStreamIndex: 2, SubtitleLanguage: "fre"));
+        t.Apply(new PlayEvent(At(10), PlayEventKind.Progress, Pos(10), false, AudioStreamIndex: 1, AudioLanguage: "eng", SubtitleStreamIndex: 2, SubtitleLanguage: "fre"));
+        t.Apply(new PlayEvent(At(20), PlayEventKind.Stop, Pos(20), false, PlayedToCompletion: false));   // Jellyfin clears the indexes before PlaybackStopped
+        Assert.Equal(2, t.Record.SubtitleStreamIndex);
+        Assert.Equal("fre", t.Record.SubtitleLanguage);
+        Assert.Equal(1, t.Record.AudioStreamIndex);
+        Assert.Equal("[]", t.Record.StreamChanges);
+    }
 }

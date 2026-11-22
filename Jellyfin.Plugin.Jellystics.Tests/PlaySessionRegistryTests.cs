@@ -165,4 +165,25 @@ public class PlaySessionRegistryTests
         r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
         Assert.True(r.IsOpen("s1"));
     }
+
+    [Fact]
+    public void ClientResumingAfterASweepStartsANewPlayImmediately()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("m"), Ev(c, PlayEventKind.Start, 0));
+        c.Advance(TimeSpan.FromMinutes(6));
+        Assert.Single(r.Sweep());
+        r.OnEvent("s1", "dev|u", () => Rec("m"), Ev(c, PlayEventKind.Progress, 400));
+        Assert.Equal(1, r.OpenCount);
+    }
+
+    [Fact]
+    public void ResolveKeyFindsTheOpenPlayOfTheSameItemWhenTheKeyDiffers()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("session-1", "dev|u", () => Rec("m"), Ev(c, PlayEventKind.Start, 0));
+        Assert.Equal("session-1", r.ResolveKey("dev|u|m", "dev|u", "m"));
+        Assert.Equal("session-1", r.ResolveKey("session-1", "dev|u", "m"));
+        Assert.Equal("dev|u|other", r.ResolveKey("dev|u|other", "dev|u", "other"));
+    }
 }

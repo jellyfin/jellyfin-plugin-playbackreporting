@@ -59,10 +59,12 @@ public class PlayStoreTests
         var p = Play("x", start);
         p.IsRemote = true; p.PlayedToCompletion = false; p.Framerate = 23.976f; p.TranscodeReasons = "[\"VideoCodecNotSupported\"]";
         p.StreamChanges = "[{\"kind\":\"audio\",\"index\":2}]"; p.SeekCount = 3; p.SkippedMs = 90000; p.RunTimeTicks = 27_000_000_000;
+        p.IsVideoDirect = false; p.IsAudioDirect = true; p.SourceWidth = 3840; p.SourceHeight = 2160; p.VideoRangeType = "DOVIWithHDR10";
         store.Upsert(new[] { p });
         var r = store.Get("x")!;
         Assert.True(r.IsRemote); Assert.False(r.PlayedToCompletion); Assert.Equal(23.976f, r.Framerate!.Value, 3);
         Assert.Equal(p.TranscodeReasons, r.TranscodeReasons); Assert.Equal(p.StreamChanges, r.StreamChanges);
+        Assert.False(r.IsVideoDirect); Assert.True(r.IsAudioDirect); Assert.Equal(3840, r.SourceWidth); Assert.Equal(2160, r.SourceHeight); Assert.Equal("DOVIWithHDR10", r.VideoRangeType);
         Assert.Equal(3, r.SeekCount); Assert.Equal(90000, r.SkippedMs); Assert.Equal(start, r.StartedAt);
     }
 

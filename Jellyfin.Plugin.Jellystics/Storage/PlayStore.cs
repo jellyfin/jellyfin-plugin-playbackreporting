@@ -14,7 +14,7 @@ public sealed class PlayStore
         "PlayedToCompletion", "DeviceId", "DeviceName", "Client", "ApplicationVersion", "RemoteEndPoint", "IsRemote", "PlayMethod",
         "AudioStreamIndex", "AudioLanguage", "AudioCodec", "SubtitleStreamIndex", "SubtitleLanguage", "StreamChanges",
         "VideoCodecFrom", "VideoCodecTo", "AudioCodecFrom", "AudioCodecTo", "Width", "Height", "Bitrate", "Framerate", "HwAccel",
-        "TranscodeReasons", "VideoRange", "State", "LastEventAt", "Source", "Version",
+        "TranscodeReasons", "VideoRange", "IsVideoDirect", "IsAudioDirect", "SourceWidth", "SourceHeight", "VideoRangeType", "State", "LastEventAt", "Source", "Version",
     };
 
     private static readonly string UpsertSql =
@@ -111,7 +111,7 @@ public sealed class PlayStore
             ["SubtitleStreamIndex"] = p.SubtitleStreamIndex, ["SubtitleLanguage"] = p.SubtitleLanguage, ["StreamChanges"] = p.StreamChanges,
             ["VideoCodecFrom"] = p.VideoCodecFrom, ["VideoCodecTo"] = p.VideoCodecTo, ["AudioCodecFrom"] = p.AudioCodecFrom,
             ["AudioCodecTo"] = p.AudioCodecTo, ["Width"] = p.Width, ["Height"] = p.Height, ["Bitrate"] = p.Bitrate,
-            ["Framerate"] = p.Framerate, ["HwAccel"] = p.HwAccel, ["TranscodeReasons"] = p.TranscodeReasons, ["VideoRange"] = p.VideoRange,
+            ["Framerate"] = p.Framerate, ["HwAccel"] = p.HwAccel, ["TranscodeReasons"] = p.TranscodeReasons, ["VideoRange"] = p.VideoRange, ["IsVideoDirect"] = p.IsVideoDirect, ["IsAudioDirect"] = p.IsAudioDirect, ["SourceWidth"] = p.SourceWidth, ["SourceHeight"] = p.SourceHeight, ["VideoRangeType"] = p.VideoRangeType,
             ["State"] = p.State, ["LastEventAt"] = JellysticsDb.Iso(p.LastEventAt), ["Source"] = p.Source, ["Version"] = p.Version,
         };
         foreach (var col in Cols) cmd.Parameters.AddWithValue("$" + col, Db(values[col]));
@@ -138,7 +138,7 @@ public sealed class PlayStore
             SubtitleStreamIndex = N<int>("SubtitleStreamIndex"), SubtitleLanguage = S("SubtitleLanguage"), StreamChanges = (string)r["StreamChanges"],
             VideoCodecFrom = S("VideoCodecFrom"), VideoCodecTo = S("VideoCodecTo"), AudioCodecFrom = S("AudioCodecFrom"),
             AudioCodecTo = S("AudioCodecTo"), Width = N<int>("Width"), Height = N<int>("Height"), Bitrate = N<int>("Bitrate"),
-            Framerate = N<float>("Framerate"), HwAccel = S("HwAccel"), TranscodeReasons = S("TranscodeReasons"), VideoRange = S("VideoRange"),
+            Framerate = N<float>("Framerate"), HwAccel = S("HwAccel"), TranscodeReasons = S("TranscodeReasons"), VideoRange = S("VideoRange"), IsVideoDirect = N<long>("IsVideoDirect") is { } ivd ? ivd != 0 : null, IsAudioDirect = N<long>("IsAudioDirect") is { } iad ? iad != 0 : null, SourceWidth = N<int>("SourceWidth"), SourceHeight = N<int>("SourceHeight"), VideoRangeType = S("VideoRangeType"),
             State = (string)r["State"], LastEventAt = JellysticsDb.ParseIso(r["LastEventAt"])!.Value, Source = (string)r["Source"],
             Version = (long)r["Version"],
         };

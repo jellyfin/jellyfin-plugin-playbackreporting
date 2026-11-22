@@ -54,6 +54,11 @@ public sealed class PlayRecord
     public string? HwAccel { get; set; }
     public string? TranscodeReasons { get; set; }
     public string? VideoRange { get; set; }
+    public bool? IsVideoDirect { get; set; }
+    public bool? IsAudioDirect { get; set; }
+    public int? SourceWidth { get; set; }
+    public int? SourceHeight { get; set; }
+    public string? VideoRangeType { get; set; }
     public string State { get; set; } = PlayStates.Open;
     public DateTimeOffset LastEventAt { get; set; }
     public string Source { get; set; } = PlaySources.Plugin;

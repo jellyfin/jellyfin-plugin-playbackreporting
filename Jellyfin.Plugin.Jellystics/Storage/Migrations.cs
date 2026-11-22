@@ -20,6 +20,7 @@ internal static class Migrations
           StreamChanges TEXT NOT NULL DEFAULT '[]',
           VideoCodecFrom TEXT, VideoCodecTo TEXT, AudioCodecFrom TEXT, AudioCodecTo TEXT, Width INTEGER, Height INTEGER,
           Bitrate INTEGER, Framerate REAL, HwAccel TEXT, TranscodeReasons TEXT, VideoRange TEXT,
+          IsVideoDirect INTEGER, IsAudioDirect INTEGER, SourceWidth INTEGER, SourceHeight INTEGER, VideoRangeType TEXT,
           State TEXT NOT NULL, LastEventAt TEXT NOT NULL, Source TEXT NOT NULL, Version INTEGER NOT NULL);
         CREATE INDEX ix_plays_version ON Plays (Version);
         CREATE INDEX ix_plays_user_started ON Plays (UserId, StartedAt);
