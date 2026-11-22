@@ -81,4 +81,15 @@ public class PlaySessionRegistryTests
         r.OnEvent("s1", "dev|u", () => Rec("m"), Ev(c, PlayEventKind.Progress, 10));
         Assert.Single(r.TakeDirtyOpen());
     }
+
+    [Fact]
+    public void MutateChangesTheOpenRecordAndMarksItDirty()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("m"), Ev(c, PlayEventKind.Start, 0));
+        r.TakeDirtyOpen();
+        r.Mutate("s1", rec => rec.PlayMethod = "Transcode");
+        r.Mutate("unknown", rec => rec.PlayMethod = "x");   // no-op
+        Assert.Equal("Transcode", Assert.Single(r.TakeDirtyOpen()).PlayMethod);
+    }
 }

@@ -91,6 +91,9 @@ public sealed class PlayTracker
         Dirty = true;
     }
 
+    /// <summary>Marks the record as changed externally (e.g. transcoding info refreshed).</summary>
+    public void Touch() => Dirty = true;
+
     public PlayRecord Snapshot()
     {
         if (Record.State == PlayStates.Open) Record.StreamChanges = JsonSerializer.Serialize(_streamChanges);

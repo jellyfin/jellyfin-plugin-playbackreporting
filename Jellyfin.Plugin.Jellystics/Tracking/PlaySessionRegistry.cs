@@ -66,6 +66,17 @@ public sealed class PlaySessionRegistry
         }
     }
 
+    /// <summary>Applies an in-place change to an open play and marks it dirty. No-op for unknown keys.</summary>
+    public void Mutate(string key, Action<PlayRecord> change)
+    {
+        lock (_lock)
+        {
+            if (!_open.TryGetValue(key, out var v)) return;
+            change(v.Tracker.Record);
+            v.Tracker.Touch();
+        }
+    }
+
     public IReadOnlyList<PlayRecord> TakeDirtyOpen()
     {
         lock (_lock) { return _open.Values.Where(v => v.Tracker.Dirty).Select(v => v.Tracker.Snapshot()).ToList(); }
