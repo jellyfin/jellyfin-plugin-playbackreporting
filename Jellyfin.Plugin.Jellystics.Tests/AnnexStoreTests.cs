@@ -42,4 +42,31 @@ public class AnnexStoreTests
         Assert.False(login.Success);
         Assert.Equal("léa", login.UserName);
     }
+
+    [Fact]
+    public void MetaFlagsRoundTrip()
+    {
+        using var t = new TempDb();
+        var annex = new AnnexStore(t.Db);
+        Assert.Null(annex.GetMeta("catalog_snapshot_done"));
+        annex.SetMeta("catalog_snapshot_done", "1");
+        annex.SetMeta("catalog_snapshot_done", "2");
+        Assert.Equal("2", annex.GetMeta("catalog_snapshot_done"));
+    }
+
+    [Fact]
+    public void ReAddingARemovedItemWritesANewAddedEvent()
+    {
+        using var t = new TempDb();
+        var annex = new AnnexStore(t.Db);
+        var at = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero);
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-i", Kind = "added", At = at, ItemId = "i" } });
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "rm-i-1", Kind = "removed", At = at.AddDays(1), ItemId = "i" } });
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-i", Kind = "added", At = at.AddDays(2), ItemId = "i" } });
+        var kinds = annex.LibrarySince(0, 10).Select(e => e.Kind).ToArray();
+        Assert.Equal(new[] { "added", "removed", "added" }, kinds);
+        // and a duplicate add right after is ignored again
+        annex.UpsertLibrary(new[] { new LibraryEventRecord { Id = "add-i", Kind = "added", At = at.AddDays(3), ItemId = "i" } });
+        Assert.Equal(3, annex.LibrarySince(0, 10).Count);
+    }
 }

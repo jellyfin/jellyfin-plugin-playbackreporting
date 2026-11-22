@@ -13,8 +13,13 @@ public sealed class AnnexStore
     // ---- library ----
     public void UpsertLibrary(IReadOnlyCollection<LibraryEventRecord> events) => Write(events, (c, tx, e) =>
     {
-        // "added" events are unique per item: an existing row is left untouched and burns no version.
-        if (e.Kind == "added" && Exists(c, tx, "LibraryEvents", e.Id)) return false;
+        // "added" events are unique per item while it stays in the library: a repeat burns no version; after a removal a new added event (timestamped id) is written.
+        if (e.Kind == "added")
+        {
+            var last = LastKind(c, tx, e.ItemId);
+            if (last == "removed") e.Id = $"add-{e.ItemId}-{e.At.UtcDateTime:yyyyMMddHHmmss}";
+            else if (last is not null || Exists(c, tx, "LibraryEvents", e.Id)) return false;
+        }
         e.Version = JellysticsDb.NextVersion(c, tx);
         Exec(c, tx,
             "INSERT INTO LibraryEvents (Id,Kind,At,ItemId,ItemType,ItemName,SeriesId,AlbumId,LibraryId,RunTimeTicks,SizeBytes,Version) " +
@@ -85,7 +90,36 @@ public sealed class AnnexStore
         Success = (long)r["Success"] != 0, Version = (long)r["Version"],
     });
 
+    // ---- meta ----
+    public string? GetMeta(string key)
+    {
+        using var c = _db.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT Value FROM Meta WHERE Key = $k";
+        cmd.Parameters.AddWithValue("$k", key);
+        return cmd.ExecuteScalar() as string;
+    }
+
+    public void SetMeta(string key, string value)
+    {
+        using var c = _db.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "INSERT INTO Meta (Key, Value) VALUES ($k, $v) ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value";
+        cmd.Parameters.AddWithValue("$k", key);
+        cmd.Parameters.AddWithValue("$v", value);
+        cmd.ExecuteNonQuery();
+    }
+
     // ---- helpers ----
+    private static string? LastKind(SqliteConnection c, SqliteTransaction? tx, string itemId)
+    {
+        using var cmd = c.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "SELECT Kind FROM LibraryEvents WHERE ItemId = $i ORDER BY Version DESC LIMIT 1";
+        cmd.Parameters.AddWithValue("$i", itemId);
+        return cmd.ExecuteScalar() as string;
+    }
+
     private void Write<T>(IReadOnlyCollection<T> rows, Func<SqliteConnection, SqliteTransaction, T, bool> write)
     {
         if (rows.Count == 0) return;

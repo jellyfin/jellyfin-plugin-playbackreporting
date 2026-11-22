@@ -37,6 +37,7 @@ internal static class Migrations
           Id TEXT PRIMARY KEY, At TEXT NOT NULL, UserId TEXT, UserName TEXT, DeviceId TEXT, DeviceName TEXT, Client TEXT,
           ApplicationVersion TEXT, RemoteEndPoint TEXT, Success INTEGER NOT NULL, Version INTEGER NOT NULL);
         CREATE INDEX ix_logins_version ON Logins (Version);
+        CREATE TABLE Meta (Key TEXT PRIMARY KEY, Value TEXT);
         """,
     };
 }
