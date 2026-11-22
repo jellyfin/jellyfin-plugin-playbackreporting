@@ -92,4 +92,77 @@ public class PlaySessionRegistryTests
         r.Mutate("unknown", rec => rec.PlayMethod = "x");   // no-op
         Assert.Equal("Transcode", Assert.Single(r.TakeDirtyOpen()).PlayMethod);
     }
+
+    [Fact]
+    public void StopForAnUnknownKeyDoesNotCloseTheLivePlayOnTheSameDevice()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
+        r.OnEvent("s2", "dev|u", () => Rec("b"), Ev(c, PlayEventKind.Start, 0));
+        var closed = r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Stop, 5));
+        Assert.Empty(closed);
+        Assert.Equal(1, r.OpenCount);
+    }
+
+    [Fact]
+    public void StopOfUnknownKeyWithNothingOpenReturnsNothing()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        Assert.Empty(r.OnEvent("x", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Stop, 5)));
+        Assert.Equal(0, r.OpenCount);
+    }
+
+    [Fact]
+    public void LateEventForAClosedKeyIsIgnored()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
+        c.Advance(TimeSpan.FromSeconds(30));
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Stop, 30));
+        c.Advance(TimeSpan.FromSeconds(1));
+        var closed = r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Progress, 31));
+        Assert.Empty(closed);
+        Assert.Equal(0, r.OpenCount);
+    }
+
+    [Fact]
+    public void ClosedKeysAreForgottenAfterTwoMinutes()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Stop, 0));
+        c.Advance(TimeSpan.FromMinutes(3));
+        r.Sweep();
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Progress, 0));
+        Assert.Equal(1, r.OpenCount);
+    }
+
+    [Fact]
+    public void DuplicateStartForTheSameItemDoesNotSplitThePlay()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
+        c.Advance(TimeSpan.FromSeconds(10));
+        var closed = r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 10));
+        Assert.Empty(closed);
+        Assert.Equal(1, r.OpenCount);
+        Assert.Equal(10_000, Assert.Single(r.TakeDirtyOpen()).WatchedMs);
+    }
+
+    [Fact]
+    public void OnEventNowStampsWithTheRegistryClock()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        r.OnEventNow("s1", "dev|u", () => Rec("a"), new PlayEvent(default, PlayEventKind.Start, 0, false));
+        Assert.Equal(c.UtcNow, Assert.Single(r.TakeDirtyOpen()).StartedAt);
+    }
+
+    [Fact]
+    public void IsOpenReflectsOpenPlays()
+    {
+        var c = new TestClock(); var r = new PlaySessionRegistry(c);
+        Assert.False(r.IsOpen("s1"));
+        r.OnEvent("s1", "dev|u", () => Rec("a"), Ev(c, PlayEventKind.Start, 0));
+        Assert.True(r.IsOpen("s1"));
+    }
 }

@@ -114,4 +114,87 @@ public class PlayTrackerTests
         t.Apply(Ev(20, PlayEventKind.Progress, 20));
         Assert.Equal(10_000, snap.WatchedMs);
     }
+
+    [Fact]
+    public void EventEarlierThanThePreviousOneIsClamped()
+    {
+        var t = Start();
+        t.Apply(Ev(30, PlayEventKind.Progress, 30));
+        t.Apply(Ev(25, PlayEventKind.Progress, 31));   // clock went backwards
+        Assert.Equal(At(30), t.Record.LastEventAt);
+        Assert.True(t.Record.WatchedMs >= 0 && t.Record.WatchedMs <= 30_000);
+    }
+
+    [Fact]
+    public void EventEarlierThanStartNeverGivesNegativeTimes()
+    {
+        var t = Start();
+        t.Apply(Ev(-5, PlayEventKind.Stop, 0));
+        Assert.True(t.Record.WatchedMs >= 0);
+        Assert.True(t.Record.EndedAt >= t.Record.StartedAt);
+    }
+
+    [Fact]
+    public void CloseAtBeforeLastEventUsesLastEventAndCapsWatched()
+    {
+        var t = Start();
+        t.Apply(Ev(30, PlayEventKind.Progress, 30));
+        t.CloseAt(At(10));
+        Assert.Equal(At(30), t.Record.EndedAt);
+        Assert.Equal(30_000, t.Record.WatchedMs);
+    }
+
+    [Fact]
+    public void SeekWhilePausedIsMeasuredAgainstZeroExpectedAdvance()
+    {
+        var t = Start();
+        t.Apply(Ev(10, PlayEventKind.Progress, 10, paused: true));
+        t.Apply(Ev(130, PlayEventKind.Progress, 10, paused: true));    // paused 120 s
+        t.Apply(Ev(131, PlayEventKind.Progress, 70, paused: true));    // scrubbed +60 s while paused
+        Assert.Equal(1, t.Record.SeekCount);
+        Assert.Equal(60_000, t.Record.SkippedMs);
+    }
+
+    [Fact]
+    public void DominantAudioTrackWinsOverTheLastOne()
+    {
+        var t = Start();
+        PlayEvent A(double s, int idx, string lang, PlayEventKind k = PlayEventKind.Progress) => new(At(s), k, Pos(s), false, AudioStreamIndex: idx, AudioLanguage: lang);
+        t.Apply(A(10, 1, "fra"));
+        t.Apply(A(510, 1, "fra"));
+        t.Apply(A(520, 2, "eng"));
+        t.Apply(A(540, 2, "eng", PlayEventKind.Stop));
+        Assert.Equal(1, t.Record.AudioStreamIndex);
+        Assert.Equal("fra", t.Record.AudioLanguage);
+        Assert.Contains("\"index\":2", t.Record.StreamChanges);
+    }
+
+    [Fact]
+    public void EventsWithoutPositionDoNotCreateFakeSeeks()
+    {
+        var t = Start();
+        t.Apply(Ev(10, PlayEventKind.Progress, 10));
+        t.Apply(new PlayEvent(At(70), PlayEventKind.Progress, null, false));   // no position for 60 s
+        t.Apply(Ev(80, PlayEventKind.Progress, 80));                            // 70 s later, 70 s of position: normal
+        Assert.Equal(0, t.Record.SeekCount);
+        Assert.Equal(0, t.Record.SkippedMs);
+    }
+
+    [Fact]
+    public void PauseTransitionOnStopIsNotAPause()
+    {
+        var t = Start();
+        t.Apply(Ev(10, PlayEventKind.Progress, 10));
+        t.Apply(Ev(11, PlayEventKind.Stop, 11, paused: true));
+        Assert.Equal(0, t.Record.PauseCount);
+    }
+
+    [Fact]
+    public void AutomatedPositionJumpIsNotASeek()
+    {
+        var t = Start();
+        t.Apply(Ev(10, PlayEventKind.Progress, 10));
+        t.Apply(new PlayEvent(At(20), PlayEventKind.Progress, Pos(200), false, IsAutomated: true));
+        Assert.Equal(0, t.Record.SeekCount);
+    }
 }

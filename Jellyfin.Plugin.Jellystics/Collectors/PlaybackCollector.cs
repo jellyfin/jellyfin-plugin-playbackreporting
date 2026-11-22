@@ -62,8 +62,10 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
         {
             if (e.Item is null || e.Users.Count == 0 || e.Item.IsThemeMedia) return;
             var key = PlayRecordFactory.Key(e);
-            var ev = _factory.ToEvent(e, kind, _clock.UtcNow, done);
-            var closed = _registry.OnEvent(key, PlayRecordFactory.DeviceUserKey(e), () => _factory.Create(e), ev);
+            // Library / media-stream lookups happen here, outside the registry lock.
+            PlayRecord? record = kind == PlayEventKind.Stop ? null : (kind == PlayEventKind.Start || !_registry.IsOpen(key) ? _factory.Create(e) : null);
+            var ev = _factory.ToEvent(e, kind, default, done);   // At is stamped by the registry, inside its lock
+            var closed = _registry.OnEventNow(key, PlayRecordFactory.DeviceUserKey(e), () => record ??= _factory.Create(e), ev);
             if (kind == PlayEventKind.Progress) _registry.Mutate(key, r => _factory.ApplyTranscoding(r, e.Session));
             Persist(closed);
         }

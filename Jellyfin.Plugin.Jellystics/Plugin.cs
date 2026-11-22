@@ -17,7 +17,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     }
 
     public override string Name => "Jellystics";
-    public override Guid Id => new("7f3c2a1e-9b84-4d6f-a2c5-3e1b8d9f6a40");
+    public const string PluginGuid = "7f3c2a1e-9b84-4d6f-a2c5-3e1b8d9f6a40";
+    public override Guid Id => new(PluginGuid);
     public override string Description => "Precise playback collector and backup for Jellystics.";
     public static Plugin? Instance { get; private set; }
     /// <summary>Gets Jellyfin's data directory (where the official playback_reporting.db lives).</summary>

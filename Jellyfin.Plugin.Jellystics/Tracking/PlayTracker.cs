@@ -15,6 +15,7 @@ public sealed class PlayTracker
     private readonly Dictionary<int, string?> _audioLang = new();
     private DateTimeOffset _lastAt;
     private long? _lastPos;
+    private DateTimeOffset _lastPosAt;
 
     public PlayTracker(PlayRecord record, PlayEvent start)
     {
@@ -27,6 +28,7 @@ public sealed class PlayTracker
         IsPlaying = !start.IsPaused;
         _lastAt = start.At;
         _lastPos = start.PositionTicks;
+        _lastPosAt = start.At;
         TrackStreams(start);
         Dirty = true;
     }
@@ -38,7 +40,8 @@ public sealed class PlayTracker
     public void Apply(PlayEvent e)
     {
         if (Record.State == PlayStates.Closed) return;
-        var dt = Math.Max(0, (long)(e.At - _lastAt).TotalMilliseconds);
+        var at = e.At < _lastAt ? _lastAt : e.At;   // never go backwards
+        var dt = (long)(at - _lastAt).TotalMilliseconds;
         long? dp = e.PositionTicks is { } p && _lastPos is { } lp ? (p - lp) / TicksPerMs : null;
 
         if (IsPlaying)
@@ -54,24 +57,27 @@ public sealed class PlayTracker
 
         if (dp is { } d && !e.IsAutomated)
         {
-            if (d > dt + SeekThresholdMs) { Record.SeekCount++; Record.SkippedMs += d - dt; }
+            // Expected advance since the last known position: real time while playing, nothing while paused.
+            var expected = IsPlaying ? (long)(at - _lastPosAt).TotalMilliseconds : 0;
+            if (d > expected + SeekThresholdMs) { Record.SeekCount++; Record.SkippedMs += d - expected; }
             else if (d < -SeekThresholdMs) { Record.SeekCount++; }
         }
 
-        if (IsPlaying && e.IsPaused) Record.PauseCount++;
+        // Clients often pause right before stopping: that is not a user pause.
+        if (IsPlaying && e.IsPaused && e.Kind != PlayEventKind.Stop) Record.PauseCount++;
         IsPlaying = !e.IsPaused;
-        TrackStreams(e);
+        TrackStreams(e with { At = at });
 
-        if (e.PositionTicks is not null) { Record.PositionEndTicks = e.PositionTicks; _lastPos = e.PositionTicks; }
-        Record.LastEventAt = e.At;
-        _lastAt = e.At;
-        Record.WatchedMs = Math.Min(Record.WatchedMs, (long)(e.At - Record.StartedAt).TotalMilliseconds);
+        if (e.PositionTicks is not null) { Record.PositionEndTicks = e.PositionTicks; _lastPos = e.PositionTicks; _lastPosAt = at; }
+        Record.LastEventAt = at;
+        _lastAt = at;
+        Record.WatchedMs = Math.Max(0, Math.Min(Record.WatchedMs, (long)(at - Record.StartedAt).TotalMilliseconds));
         Dirty = true;
 
         if (e.Kind == PlayEventKind.Stop)
         {
             Record.PlayedToCompletion = e.PlayedToCompletion;
-            CloseAt(e.At);
+            CloseAt(at);
         }
     }
 
@@ -79,13 +85,15 @@ public sealed class PlayTracker
     public void CloseAt(DateTimeOffset at)
     {
         if (Record.State == PlayStates.Closed) return;
+        if (at < Record.LastEventAt) at = Record.LastEventAt;
         Record.EndedAt = at < Record.StartedAt ? Record.StartedAt : at;
         Record.State = PlayStates.Closed;
+        Record.WatchedMs = Math.Max(0, Math.Min(Record.WatchedMs, (long)(Record.EndedAt.Value - Record.StartedAt).TotalMilliseconds));
         if (_audioMs.Count > 0)
         {
             var dominant = _audioMs.MaxBy(kv => kv.Value).Key;
             Record.AudioStreamIndex = dominant;
-            Record.AudioLanguage = _audioLang.GetValueOrDefault(dominant) ?? Record.AudioLanguage;
+            Record.AudioLanguage = _audioLang.GetValueOrDefault(dominant);
         }
         Record.StreamChanges = JsonSerializer.Serialize(_streamChanges);
         Dirty = true;

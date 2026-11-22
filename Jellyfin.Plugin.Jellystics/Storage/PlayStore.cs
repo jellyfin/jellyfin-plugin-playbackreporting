@@ -50,6 +50,7 @@ public sealed class PlayStore
     public long Cursor() { using var c = _db.Open(); return JellysticsDb.CurrentVersion(c); }
 
     /// <summary>Closes plays left open (crash / restart) at their last event. Returns how many.</summary>
+    /// <remarks>Dominant audio track is not computed here (acceptable for crash recovery). One Upsert = one transaction.</remarks>
     public int CloseOpenPlays()
     {
         var open = Query("SELECT * FROM Plays WHERE State = 'open'");
@@ -68,6 +69,7 @@ public sealed class PlayStore
         return cmd.ExecuteScalar() is not null;
     }
 
+    /// <summary>Deletes without tombstones: sync consumers (cursor on Version) will not see these deletions.</summary>
     public int PurgeBefore(DateTimeOffset before)
     {
         using var c = _db.Open();

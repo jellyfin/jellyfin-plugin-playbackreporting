@@ -78,4 +78,39 @@ public class PlayStoreTests
         Assert.False(store.ExistsOverlapping("u1", "i1", start.AddMinutes(41), start.AddMinutes(90), PlaySources.Plugin));
         Assert.False(store.ExistsOverlapping("u2", "i1", start, start.AddMinutes(10), PlaySources.Plugin));
     }
+
+    [Fact]
+    public void NullsRoundTrip()
+    {
+        using var t = new TempDb();
+        var s = new PlayStore(t.Db);
+        s.Upsert(new[] { Play("n", new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero)) });
+        var p = s.Get("n")!;
+        Assert.Null(p.EndedAt); Assert.Null(p.PlayedToCompletion); Assert.Null(p.IsRemote);
+        Assert.Null(p.ParentIndexNumber); Assert.Null(p.Width); Assert.Null(p.Bitrate); Assert.Null(p.Framerate); Assert.Null(p.PositionEndTicks);
+    }
+
+    [Fact]
+    public void SinceHonoursLimitAndEmpty()
+    {
+        using var t = new TempDb();
+        var s = new PlayStore(t.Db);
+        Assert.Empty(s.Since(0, 10));
+        var d = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero);
+        s.Upsert(new[] { Play("a", d), Play("b", d), Play("c", d) });
+        Assert.Equal(2, s.Since(0, 2).Count);
+        Assert.Empty(s.Since(s.Cursor(), 10));
+    }
+
+    [Fact]
+    public void WriteAfterReadingAPageAppearsInTheNextPage()
+    {
+        using var t = new TempDb();
+        var s = new PlayStore(t.Db);
+        var d = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero);
+        s.Upsert(new[] { Play("a", d), Play("b", d) });
+        var page = s.Since(0, 10);
+        s.Upsert(new[] { Play("c", d) });
+        Assert.Equal("c", Assert.Single(s.Since(page[^1].Version, 10)).Id);
+    }
 }

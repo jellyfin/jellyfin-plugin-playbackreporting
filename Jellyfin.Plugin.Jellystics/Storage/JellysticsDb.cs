@@ -59,5 +59,5 @@ public sealed class JellysticsDb
     }
 
     public static string? Iso(DateTimeOffset? v) => v?.UtcDateTime.ToString("O");
-    public static DateTimeOffset? ParseIso(object v) => v is string s ? DateTimeOffset.Parse(s, null, System.Globalization.DateTimeStyles.RoundtripKind) : null;
+    public static DateTimeOffset? ParseIso(object v) => v is string s ? DateTimeOffset.ParseExact(s, "O", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 }
