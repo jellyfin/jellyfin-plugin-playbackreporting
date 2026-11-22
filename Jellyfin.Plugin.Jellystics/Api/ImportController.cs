@@ -39,9 +39,15 @@ public class ImportController : ControllerBase
     [HttpPost("Purge")]
     public async Task<ActionResult> Purge([FromBody] PurgeRequest request)
     {
-        var deleted = 0;
-        _queue.Enqueue(() => deleted = _store.PurgeBefore(request.Before));
-        await _queue.FlushAsync().ConfigureAwait(false);
-        return Ok(new { deleted });
+        if (request is null || request.Before == default) return BadRequest(new { error = "A \"before\" date is required" });
+        var done = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queued = _queue.Enqueue(() =>
+        {
+            try { done.SetResult(_store.PurgeBefore(request.Before)); }
+            catch (Exception ex) { done.SetException(ex); }
+        });
+        if (!queued) return StatusCode(503, new { error = "Jellyfin is shutting down" });
+        try { return Ok(new { deleted = await done.Task.ConfigureAwait(false) }); }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 }

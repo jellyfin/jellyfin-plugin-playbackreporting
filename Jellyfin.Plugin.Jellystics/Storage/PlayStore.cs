@@ -69,12 +69,12 @@ public sealed class PlayStore
         return cmd.ExecuteScalar() is not null;
     }
 
-    /// <summary>Deletes without tombstones: sync consumers (cursor on Version) will not see these deletions.</summary>
+    /// <summary>Deletes closed plays only (never a play in progress), without tombstones: sync consumers (cursor on Version) will not see these deletions.</summary>
     public int PurgeBefore(DateTimeOffset before)
     {
         using var c = _db.Open();
         using var cmd = c.CreateCommand();
-        cmd.CommandText = "DELETE FROM Plays WHERE StartedAt < $b";
+        cmd.CommandText = "DELETE FROM Plays WHERE StartedAt < $b AND State = 'closed'";
         cmd.Parameters.AddWithValue("$b", JellysticsDb.Iso(before));
         return cmd.ExecuteNonQuery();
     }

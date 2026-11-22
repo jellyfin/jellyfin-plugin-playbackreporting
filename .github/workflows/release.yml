@@ -34,6 +34,9 @@ jobs:
         run: |
           sed -i "s#<Version>.*</Version>#<Version>${VERSION}</Version>#; s#<AssemblyVersion>.*</AssemblyVersion>#<AssemblyVersion>${VERSION}</AssemblyVersion>#; s#<FileVersion>.*</FileVersion>#<FileVersion>${VERSION}</FileVersion>#" Directory.Build.props
 
+      - name: Test
+        run: dotnet test
+
       - name: Build
         run: dotnet build Jellyfin.Plugin.Jellystics/Jellyfin.Plugin.Jellystics.csproj --configuration Release
 
@@ -49,7 +52,13 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git fetch origin
+          git checkout -- Directory.Build.props   # the version edit was only for the build
           git checkout -B master origin/master
+
+          if jq -e --arg v "$VERSION" '.[0].versions | any(.version == $v)' manifest.json > /dev/null; then
+            echo "manifest already lists $VERSION, nothing to commit"
+            exit 0
+          fi
 
           cat <<EOF > new_version.json
           {
@@ -73,6 +82,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
           name: v${{ env.VERSION }}
           draft: false
           prerelease: false

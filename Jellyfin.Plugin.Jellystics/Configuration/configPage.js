@@ -67,10 +67,15 @@ export default function (view) {
       .finally(Dashboard.hideLoadingMsg);
   }
 
+  // Dashboard.alert renders HTML: server supplied text must never reach it with markup in it.
+  function plain(text) {
+    return String(text).replace(/[<>&"']/g, "");
+  }
+
   async function errorText(error, fallback) {
     try {
       const body = await error.json();
-      return body.error || fallback;
+      return plain(body.error || fallback);
     } catch (e) {
       return fallback;
     }
@@ -114,7 +119,7 @@ export default function (view) {
         data: JSON.stringify({ before: before }),
         dataType: "json",
       });
-      Dashboard.alert({ message: result.deleted + " play(s) deleted.", title: "Purge" });
+      Dashboard.alert({ message: plain(result.deleted) + " play(s) deleted.", title: "Purge" });
     } catch (error) {
       Dashboard.alert({ message: await errorText(error, "Purge failed."), title: "Error" });
     }

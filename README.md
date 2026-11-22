@@ -12,6 +12,10 @@ Add this repository manifest URL in Jellyfin (Dashboard > Plugins > Repositories
 
 Based on jellyfin-plugin-playbackreporting (GPL-3).
 
+## Purge
+
+Dashboard > Plugins > Jellystics can delete closed plays older than a date. The purge is local to the plugin: it is not propagated to Jellystics, and importing the official Playback Reporting history again restores purged rows that came from it.
+
 ## Development
 
 Requires the Nix dev shell (`nix develop`, or direnv): dotnet 9, go-task, docker, sqlite.
