@@ -26,7 +26,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public IEnumerable<PluginPageInfo> GetPages() => new[]
     {
-        new PluginPageInfo { Name = "Jellystics", EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html" },
-        new PluginPageInfo { Name = "jellystics.js", EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js" },
+        new PluginPageInfo { Name = "Jellystics", DisplayName = "Jellystics", EnableInMainMenu = true, MenuSection = "server", MenuIcon = "insights", EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html" },
+        new PluginPageInfo { Name = "JellysticsConfig", EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js" },
     };
 }
