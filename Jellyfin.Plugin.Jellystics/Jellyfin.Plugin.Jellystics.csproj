@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.Jellystics</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.11" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Configuration\configPage.html;Configuration\configPage.js" />
+    <EmbeddedResource Include="Configuration\configPage.html;Configuration\configPage.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.Jellystics.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,20 +1,13 @@
 ---
-name: "Playback Reporting"
-guid: "5c534381-91a3-43cb-907a-35aa02eb9d2c"
-imageUrl: "https://repo.jellyfin.org/releases/plugin/images/jellyfin-plugin-playbackreporting.png"
-version: 19
-targetAbi: "12.0.0.0"
-framework: "net10.0"
-owner: "jellyfin"
-overview: "Collect and show user play statistics"
-description: "Collect and show user play statistics"
-category: "Administration"
+name: "Jellystics"
+guid: "7f3c2a1e-9b84-4d6f-a2c5-3e1b8d9f6a40"
+version: "0.1.0.0"
+targetAbi: "10.11.0.0"
+framework: "net9.0"
+owner: "Jellystics"
+overview: "Precise playback collector and backup for Jellystics"
+description: "Records every playback from Jellyfin events (real watch time, pauses, seeks, tracks, transcoding) and keeps a full history that Jellystics syncs from."
+category: "General"
 artifacts:
-  - "Jellyfin.Plugin.PlaybackReporting.dll"
-  - "SQLitePCL.pretty.dll"
-changelog: |-
-  - Unstable: Update to latest Jellyfin preview packages (#127) @crobibero, @jellyfin-bot
-  - Redesign pages, add CSS where it is missing (#111) @Krafting, Krafting
-  - Remove unsafe SQLite reconfiguration (#139) @IDisposable
-  - Fix URL parameter name for loading backup file (#138) @realansgar
-  - Change total_time type from int to long (#120) @wafflesLL
+  - "Jellyfin.Plugin.Jellystics.dll"
+changelog: "- Initial collector"
