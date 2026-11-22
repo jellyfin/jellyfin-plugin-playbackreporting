@@ -80,6 +80,8 @@ public class SyncController : ControllerBase
                 {
                     if (p is null || string.IsNullOrWhiteSpace(p.Id) || string.IsNullOrWhiteSpace(p.UserId) || string.IsNullOrWhiteSpace(p.ItemId) || p.StartedAt == default) { rejected++; continue; }
                     if (!seen.Add(p.Id) || _plays.Get(p.Id) is not null) { skipped++; continue; }
+                    if (Guid.TryParse(p.UserId, out var uid)) p.UserId = uid.ToString("N");
+                    if (Guid.TryParse(p.ItemId, out var iid)) p.ItemId = iid.ToString("N");
                     p.Source = PlaySources.ImportJellystics;
                     p.State = PlayStates.Closed;
                     if (p.LastEventAt == default) p.LastEventAt = p.EndedAt ?? p.StartedAt;
@@ -135,8 +137,14 @@ public class SyncController : ControllerBase
 /// <summary>ISO-8601 UTC with a Z; input without an offset is read as UTC.</summary>
 internal sealed class UtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 {
-    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        DateTimeOffset.Parse(reader.GetString()!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime();
+    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String) throw new JsonException("A date must be an ISO-8601 string");
+        var s = reader.GetString();
+        if (!DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var value))
+            throw new JsonException($"Invalid date \"{s}\"");
+        return value.ToUniversalTime();
+    }
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
