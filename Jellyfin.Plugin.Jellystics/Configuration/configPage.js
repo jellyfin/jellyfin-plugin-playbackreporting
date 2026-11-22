@@ -15,6 +15,7 @@ export default function (view) {
     if (s.State === "running") {
       importStatus.textContent = "Status: import running...";
     } else if (s.State === "done") {
+      loadInfo();
       importStatus.textContent =
         "Status: done. read " + s.Read + " / imported " + s.Imported +
         " / skipped " + s.Skipped + " / repaired " + s.Repaired;
@@ -22,6 +23,19 @@ export default function (view) {
       importStatus.textContent = "Status: failed. " + (s.Error || "");
     } else {
       importStatus.textContent = "Status: idle";
+    }
+  }
+
+  async function loadInfo() {
+    const el = view.querySelector("#pluginStatus");
+    try {
+      const info = await ApiClient.fetch({ url: ApiClient.getUrl("Jellystics/Info"), type: "GET", dataType: "json" });
+      el.textContent =
+        "Version " + info.pluginVersion + " / " + info.counts.plays + " plays, " + info.counts.libraryEvents + " library events, " +
+        info.counts.userDataEvents + " marks, " + info.counts.logins + " logins / first play " + (info.firstPlayAt || "none") + " / sync cursor " + info.cursor;
+    } catch (error) {
+      console.error("Jellystics: cannot read the plugin info", error);
+      el.textContent = "Status unavailable";
     }
   }
 
@@ -128,6 +142,7 @@ export default function (view) {
   view.addEventListener("viewshow", function () {
     loadConfig();
     refreshStatus();
+    loadInfo();
   });
 
   view.addEventListener("viewhide", function () {

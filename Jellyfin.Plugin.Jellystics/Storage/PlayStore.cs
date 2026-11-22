@@ -47,6 +47,24 @@ public sealed class PlayStore
 
     public PlayRecord? Get(string id) => Query("SELECT * FROM Plays WHERE Id = $id", ("$id", id)).FirstOrDefault();
 
+    public long Count() => Scalar("SELECT COUNT(*) FROM Plays");
+
+    public DateTimeOffset? FirstPlayAt()
+    {
+        using var c = _db.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT MIN(StartedAt) FROM Plays";
+        return cmd.ExecuteScalar() is string s ? JellysticsDb.ParseIso(s) : null;
+    }
+
+    private long Scalar(string sql)
+    {
+        using var c = _db.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = sql;
+        return (long)cmd.ExecuteScalar()!;
+    }
+
     public long Cursor() { using var c = _db.Open(); return JellysticsDb.CurrentVersion(c); }
 
     /// <summary>Closes plays left open (crash / restart) at their last event. Returns how many.</summary>

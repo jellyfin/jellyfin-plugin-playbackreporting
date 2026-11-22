@@ -20,6 +20,19 @@ public sealed class WriteQueue : BackgroundService
         return false;
     }
 
+    /// <summary>Runs <paramref name="work"/> on the queue and returns its result; faults with the work's exception, or fails immediately when the queue is stopped.</summary>
+    public Task<T> RunAsync<T>(Func<T> work)
+    {
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queued = Enqueue(() =>
+        {
+            try { done.SetResult(work()); }
+            catch (Exception ex) { done.SetException(ex); }
+        });
+        if (!queued) done.SetException(new InvalidOperationException("The write queue is stopped"));
+        return done.Task;
+    }
+
     /// <summary>Completes when everything queued before this call has run (immediately when the queue is stopped).</summary>
     public Task FlushAsync()
     {

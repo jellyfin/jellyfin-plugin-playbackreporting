@@ -45,6 +45,17 @@ public sealed class AnnexStore
         return (long)cmd.ExecuteScalar()!;
     }
 
+    public long CountUserData() => Count("UserDataEvents");
+    public long CountLogins() => Count("Logins");
+
+    private long Count(string table)
+    {
+        using var c = _db.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
+        return (long)cmd.ExecuteScalar()!;
+    }
+
     public IReadOnlyList<LibraryEventRecord> LibrarySince(long since, int limit) => Read("LibraryEvents", since, limit, r => new LibraryEventRecord
     {
         Id = (string)r["Id"], Kind = (string)r["Kind"], At = JellysticsDb.ParseIso(r["At"])!.Value, ItemId = (string)r["ItemId"],
