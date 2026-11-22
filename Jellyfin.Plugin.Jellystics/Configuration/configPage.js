@@ -12,14 +12,14 @@ export default function (view) {
   let pollTimer = null;
 
   function renderStatus(s) {
-    if (s.state === "running") {
+    if (s.State === "running") {
       importStatus.textContent = "Status: import running...";
-    } else if (s.state === "done") {
+    } else if (s.State === "done") {
       importStatus.textContent =
-        "Status: done. read " + s.read + " / imported " + s.imported +
-        " / skipped " + s.skipped + " / repaired " + s.repaired;
-    } else if (s.state === "failed") {
-      importStatus.textContent = "Status: failed. " + (s.error || "");
+        "Status: done. read " + s.Read + " / imported " + s.Imported +
+        " / skipped " + s.Skipped + " / repaired " + s.Repaired;
+    } else if (s.State === "failed") {
+      importStatus.textContent = "Status: failed. " + (s.Error || "");
     } else {
       importStatus.textContent = "Status: idle";
     }
@@ -33,7 +33,7 @@ export default function (view) {
         dataType: "json",
       });
       renderStatus(s);
-      if (s.state === "running") {
+      if (s.State === "running") {
         schedulePoll();
       }
     } catch (error) {
