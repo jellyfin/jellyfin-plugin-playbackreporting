@@ -79,6 +79,18 @@ public class SyncControllerTests
     }
 
     [Fact]
+    public void InfoDatabaseIdIsStableAndChangesWithTheDatabase()
+    {
+        using var e = new Env();
+        var id = Json(e.Controller.Info()).RootElement.GetProperty("databaseId").GetString();
+        Assert.Matches("^[0-9a-f]{32}$", id);
+        e.Db.Db.Migrate();   // restart on the same database
+        Assert.Equal(id, Json(e.Controller.Info()).RootElement.GetProperty("databaseId").GetString());
+        using var other = new Env();   // reinstall / lost database
+        Assert.NotEqual(id, Json(other.Controller.Info()).RootElement.GetProperty("databaseId").GetString());
+    }
+
+    [Fact]
     public void InfoCursorIsTheGlobalMaxVersionAcrossTables()
     {
         using var e = new Env();

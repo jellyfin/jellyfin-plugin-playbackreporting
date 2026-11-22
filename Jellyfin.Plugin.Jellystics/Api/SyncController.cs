@@ -41,6 +41,7 @@ public class SyncController : ControllerBase
         pluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.0.0.0",
         schemaVersion = SchemaVersion,
         cursor = _plays.Cursor(),   // global max Version (one counter shared by every table)
+        databaseId = _annex.GetMeta(JellysticsDb.DatabaseIdKey),   // changes when the database is recreated (reinstall, lost db)
         firstPlayAt = _plays.FirstPlayAt(),
         counts = new { plays = _plays.Count(), libraryEvents = _annex.CountLibrary(), userDataEvents = _annex.CountUserData(), logins = _annex.CountLogins() },
         serverTimeZone = TimeZoneInfo.Local.Id,

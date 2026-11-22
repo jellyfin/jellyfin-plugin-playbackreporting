@@ -5,6 +5,9 @@ namespace Jellyfin.Plugin.Jellystics.Storage;
 /// <summary>Connection factory + migrations for jellystics.db.</summary>
 public sealed class JellysticsDb
 {
+    /// <summary>Meta key of the random id generated with the database (exposed by /Jellystics/Info).</summary>
+    public const string DatabaseIdKey = "DatabaseId";
+
     private readonly string _connectionString;
 
     public JellysticsDb(string path)
@@ -39,6 +42,14 @@ public sealed class JellysticsDb
             using (var run = c.CreateCommand()) { run.Transaction = tx; run.CommandText = Migrations.Scripts[v]; run.ExecuteNonQuery(); }
             using (var set = c.CreateCommand()) { set.Transaction = tx; set.CommandText = "UPDATE schema_version SET version = $v"; set.Parameters.AddWithValue("$v", v + 1); set.ExecuteNonQuery(); }
             tx.Commit();
+        }
+        // Identity of this database: a new id tells Jellystics the plugin data was reset (its cursors restart at 0).
+        using (var id = c.CreateCommand())
+        {
+            id.CommandText = "INSERT OR IGNORE INTO Meta (Key, Value) VALUES ($k, $v)";
+            id.Parameters.AddWithValue("$k", DatabaseIdKey);
+            id.Parameters.AddWithValue("$v", Guid.NewGuid().ToString("N"));
+            id.ExecuteNonQuery();
         }
     }
 
