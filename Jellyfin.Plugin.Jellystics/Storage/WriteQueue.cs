@@ -12,32 +12,43 @@ public sealed class WriteQueue : BackgroundService
 
     public WriteQueue(ILogger<WriteQueue> logger) => _logger = logger;
 
-    public void Enqueue(Action work) => _channel.Writer.TryWrite(work);
+    /// <summary>Queues work; returns false (and drops it) once the queue has been stopped.</summary>
+    public bool Enqueue(Action work)
+    {
+        if (_channel.Writer.TryWrite(work)) return true;
+        _logger.LogWarning("Jellystics write queue is stopped, work dropped");
+        return false;
+    }
 
+    /// <summary>Completes when everything queued before this call has run (immediately when the queue is stopped).</summary>
     public Task FlushAsync()
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Enqueue(() => done.SetResult());
-        return done.Task;
+        return Enqueue(() => done.SetResult()) ? done.Task : Task.CompletedTask;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try
-        {
-            await foreach (var work in _channel.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
-            {
-                try { work(); }
-                catch (Exception ex) { _logger.LogError(ex, "Jellystics write failed"); }
-            }
-        }
-        catch (OperationCanceledException) { }
+        // Not tied to the stopping token: the loop ends only when the writer is completed, after the backlog has been drained.
+        await foreach (var work in _channel.Reader.ReadAllAsync(CancellationToken.None).ConfigureAwait(false)) Run(work);
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _channel.Writer.TryComplete();
-        while (_channel.Reader.TryRead(out var work)) { try { work(); } catch (Exception ex) { _logger.LogError(ex, "Jellystics write failed"); } }
+        if (ExecuteTask is { } running)
+        {
+            try { await running.WaitAsync(cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) { _logger.LogWarning("Jellystics write queue did not drain before shutdown"); }
+        }
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void Run(Action work)
+    {
+        try { work(); return; }
+        catch (Exception first) { _logger.LogWarning(first, "Jellystics write failed, retrying once"); }
+        try { work(); }
+        catch (Exception ex) { _logger.LogError(ex, "Jellystics write failed"); }
     }
 }
