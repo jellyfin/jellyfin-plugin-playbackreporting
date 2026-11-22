@@ -16,7 +16,7 @@ public class PbrImporterTests
         };
     }
 
-    private static string MakePbrDb(params (string date, string user, string item, string type, string name, string method, long dur)[] rows)
+    internal static string MakePbrDb(params (string date, string user, string item, string type, string name, string method, long dur)[] rows)
     {
         var path = Path.Combine(Path.GetTempPath(), $"pbr-{Guid.NewGuid():N}.db");
         using var c = new SqliteConnection($"Data Source={path}");

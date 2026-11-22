@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.Jellystics.Collectors;
+using Jellyfin.Plugin.Jellystics.Import;
 using Jellyfin.Plugin.Jellystics.Storage;
 using Jellyfin.Plugin.Jellystics.Tracking;
 using MediaBrowser.Controller;
@@ -30,6 +31,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<AnnexStore>();
         serviceCollection.AddHostedService<LibraryCollector>();
         serviceCollection.AddHostedService<UserDataCollector>();
+        serviceCollection.AddSingleton<IItemLookup, LibraryItemLookup>();
+        serviceCollection.AddSingleton(sp => new PbrImporter(sp.GetRequiredService<PlayStore>(), sp.GetRequiredService<IItemLookup>(), TimeZoneInfo.Local));
+        serviceCollection.AddSingleton(sp => new ImportJobs(path => sp.GetRequiredService<PbrImporter>().Import(path)));
         serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, LoginSucceededConsumer>();
         serviceCollection.AddScoped<IEventConsumer<AuthenticationRequestEventArgs>, LoginFailedConsumer>();
     }
