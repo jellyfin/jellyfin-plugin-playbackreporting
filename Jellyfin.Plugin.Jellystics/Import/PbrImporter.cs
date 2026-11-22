@@ -43,21 +43,28 @@ public sealed record PbrImportResult(int Read, int Imported, int Skipped, int Re
 public sealed class PbrImporter
 {
     private const int BatchSize = 500;
-    private static readonly Regex MethodPattern = new(@"^(\w+)(?: \(v:([^\s)]+) a:([^\s)]+)\))?$", RegexOptions.Compiled);
+    private static readonly Regex MethodPattern = new(@"^(\w+)(?: \(v:([^\s)]*) a:([^\s)]*)\))?$", RegexOptions.Compiled);
 
     private readonly PlayStore _store;
     private readonly IItemLookup _items;
     private readonly TimeZoneInfo _serverZone;
+    private static readonly string[] OffsetFormats = { "yyyy-MM-dd HH:mm:ss.FFFFFFFK", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK" };
+    private static readonly string[] LocalFormats = { "yyyy-MM-dd HH:mm:ss.FFFFFFF", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF" };
 
     public PbrImporter(PlayStore store, IItemLookup items, TimeZoneInfo serverZone)
     {
         _store = store; _items = items; _serverZone = serverZone;
     }
 
+    /// <remarks>
+    /// Writes its batches straight to the store, deliberately outside the WriteQueue (a long import must not starve live plays);
+    /// the single SQLite writer lock is shared through the connection busy_timeout, so both sides wait for each other briefly.
+    /// </remarks>
     public PbrImportResult Import(string dbPath, IProgress<int>? progress = null, CancellationToken ct = default)
     {
         int read = 0, imported = 0, skipped = 0, repaired = 0;
         var batch = new List<PlayRecord>(BatchSize);
+        var cache = new Dictionary<string, ItemInfo?>();
 
         using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = dbPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         c.Open();
@@ -68,24 +75,28 @@ public sealed class PbrImporter
         {
             ct.ThrowIfCancellationRequested();
             read++;
-            var rowId = r.GetInt64(0);
-            var userId = r.IsDBNull(2) ? string.Empty : r.GetString(2);
-            var itemId = r.IsDBNull(3) ? string.Empty : r.GetString(3);
-            var local = DateTime.SpecifyKind(DateTime.Parse(r.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Unspecified);
-            var started = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, _serverZone), TimeSpan.Zero).AddSeconds(-20);
-
-            var info = _items.Find(itemId);
-            var rawSeconds = r.IsDBNull(9) ? 0 : r.GetInt64(9);
-            var seconds = DurationRepair.RepairSeconds(rawSeconds, info?.RunTimeTicks);
-            if (seconds != rawSeconds) repaired++;
-            var end = started.AddSeconds(seconds);
-
-            if (_store.ExistsOverlapping(userId, itemId, started, end, PlaySources.Plugin)) { skipped++; }
-            else
+            try
             {
+                var rowId = r.GetInt64(0);
+                var id = "pbr-" + rowId;
+                // Re-imports leave existing rows alone (an upsert would bump their Version and make sync consumers re-read them).
+                if (_store.Get(id) is not null) { skipped++; continue; }
+
+                var userId = NormalizeId(r.IsDBNull(2) ? string.Empty : r.GetString(2));
+                var itemId = NormalizeId(r.IsDBNull(3) ? string.Empty : r.GetString(3));
+                var started = ParseStart(r.GetString(1)).AddSeconds(-20);
+
+                if (!cache.TryGetValue(itemId, out var info)) cache[itemId] = info = _items.Find(itemId);
+                var rawSeconds = r.IsDBNull(9) ? 0 : r.GetInt64(9);
+                var seconds = DurationRepair.RepairSeconds(rawSeconds, info?.RunTimeTicks);
+                var end = started.AddSeconds(seconds);
+
+                if (_store.ExistsOverlapping(userId, itemId, started, end, PlaySources.Plugin)) { skipped++; continue; }
+
+                if (seconds != rawSeconds) repaired++;
                 var play = new PlayRecord
                 {
-                    Id = "pbr-" + rowId, UserId = userId, ItemId = itemId, ItemName = r.IsDBNull(5) ? null : r.GetString(5),
+                    Id = id, UserId = userId, ItemId = itemId, ItemName = r.IsDBNull(5) ? null : r.GetString(5),
                     ItemType = info?.ItemType ?? (r.IsDBNull(4) ? null : r.GetString(4)), RunTimeTicks = info?.RunTimeTicks,
                     SeriesId = info?.SeriesId, SeriesName = info?.SeriesName, SeasonId = info?.SeasonId, AlbumId = info?.AlbumId, AlbumName = info?.AlbumName,
                     ParentIndexNumber = info?.ParentIndexNumber, IndexNumber = info?.IndexNumber, LibraryId = info?.LibraryId,
@@ -98,20 +109,43 @@ public sealed class PbrImporter
                 imported++;
                 if (batch.Count >= BatchSize) { _store.Upsert(batch); batch.Clear(); }
             }
-            if (read % 100 == 0) progress?.Report(read);
+            catch (Exception ex) when (ex is FormatException or InvalidCastException or ArgumentException or OverflowException)
+            {
+                skipped++;   // a malformed row must not abort the whole import
+            }
+            finally
+            {
+                if (read % 100 == 0) progress?.Report(read);
+            }
         }
         if (batch.Count > 0) _store.Upsert(batch);
         progress?.Report(read);
         return new PbrImportResult(read, imported, skipped, repaired);
     }
 
+    private static string NormalizeId(string id) => Guid.TryParse(id, out var g) ? g.ToString("N") : id;
+
+    /// <summary>PBR stores <c>DateTime.Now</c> of the server (local, "yyyy-MM-dd HH:mm:ss.FFFFFFF"); values carrying an offset or Z are converted directly.</summary>
+    private DateTimeOffset ParseStart(string value)
+    {
+        var s = value.Trim();
+        if (DateTimeOffset.TryParseExact(s, OffsetFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var withOffset) && (s.EndsWith('Z') || s.Contains('+') || s.LastIndexOf('-') > 10))
+            return withOffset.ToUniversalTime();
+        var local = DateTime.SpecifyKind(DateTime.ParseExact(s, LocalFormats.Append("yyyy-MM-dd HH:mm:ss").ToArray(), CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Unspecified);
+        if (_serverZone.IsInvalidTime(local)) local = local.AddHours(1);   // clock gap of a DST change
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, _serverZone), TimeSpan.Zero);
+    }
+
+    private static string? Codec(string value) =>
+        string.IsNullOrWhiteSpace(value) || value.Equals("direct", StringComparison.OrdinalIgnoreCase) || value.Equals("na", StringComparison.OrdinalIgnoreCase) ? null : value;
+
     private static void ApplyMethod(PlayRecord play, string? method)
     {
-        if (string.IsNullOrWhiteSpace(method)) return;
+        if (string.IsNullOrWhiteSpace(method) || method.Trim().Equals("na", StringComparison.OrdinalIgnoreCase)) return;
         var m = MethodPattern.Match(method.Trim());
         if (!m.Success) { play.PlayMethod = method.Trim(); return; }
         play.PlayMethod = m.Groups[1].Value;
-        if (m.Groups[2].Success && !m.Groups[2].Value.Equals("direct", StringComparison.OrdinalIgnoreCase)) play.VideoCodecTo = m.Groups[2].Value;
-        if (m.Groups[3].Success && !m.Groups[3].Value.Equals("direct", StringComparison.OrdinalIgnoreCase)) play.AudioCodecTo = m.Groups[3].Value;
+        if (m.Groups[2].Success) play.VideoCodecTo = Codec(m.Groups[2].Value);
+        if (m.Groups[3].Success) play.AudioCodecTo = Codec(m.Groups[3].Value);
     }
 }

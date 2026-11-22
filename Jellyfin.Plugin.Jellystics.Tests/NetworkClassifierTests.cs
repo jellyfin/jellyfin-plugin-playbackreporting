@@ -13,6 +13,10 @@ public class NetworkClassifierTests
     [InlineData("[fe80::1]:8096", false)]
     [InlineData("fd12:3456::1", false)]
     [InlineData("::ffff:192.168.0.2", false)]
+    [InlineData("ff02::1", false)]
+    [InlineData("224.0.0.251", false)]
+    [InlineData("0.0.0.0", false)]
+    [InlineData("::", false)]
     [InlineData("82.64.10.1", true)]
     [InlineData("2a01:e0a::1", true)]
     public void Classifies(string ep, bool remote) => Assert.Equal(remote, NetworkClassifier.IsRemote(ep));

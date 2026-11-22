@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Jellyfin.Plugin.Jellystics.Tests;
 
-public class PbrImporterTests
+public class PbrImporterTests : IDisposable
 {
     private sealed class FakeItems : IItemLookup
     {
@@ -15,6 +15,10 @@ public class PbrImporterTests
             _ => null,
         };
     }
+
+    private readonly List<string> _files = new();
+    public void Dispose() { foreach (var f in _files) { try { File.Delete(f); } catch (IOException) { } } }
+    private string Pbr(params (string date, string user, string item, string type, string name, string method, long dur)[] rows) { var p = MakePbrDb(rows); _files.Add(p); return p; }
 
     internal static string MakePbrDb(params (string date, string user, string item, string type, string name, string method, long dur)[] rows)
     {
@@ -45,7 +49,7 @@ public class PbrImporterTests
         using var t = new TempDb();
         var store = new PlayStore(t.Db);
         var paris = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
-        var pbr = MakePbrDb(
+        var pbr = Pbr(
             ("2026-05-08 16:31:28.5733949", "u1", "ep1", "Episode", "Station Nord - s01e04 - Le phare", "DirectPlay", -2147483648),
             ("2026-07-20 18:55:23.8036003", "u1", "ep1", "Episode", "Station Nord - s01e04 - Le phare", "Transcode (v:h264 a:aac)", 166552),
             ("2026-08-01 21:00:20.0000000", "u2", "m9", "Movie", "Atlas", "DirectStream", 5400));
@@ -83,9 +87,92 @@ public class PbrImporterTests
         var utc = TimeZoneInfo.Utc;
         var start = new DateTimeOffset(2026, 8, 1, 21, 0, 0, TimeSpan.Zero);
         store.Upsert(new[] { new PlayRecord { Id = "live", UserId = "u2", ItemId = "m9", StartedAt = start, EndedAt = start.AddMinutes(90), LastEventAt = start.AddMinutes(90), State = PlayStates.Closed } });
-        var pbr = MakePbrDb(("2026-08-01 21:00:20.0000000", "u2", "m9", "Movie", "Atlas", "DirectPlay", 5390));
+        var pbr = Pbr(("2026-08-01 21:00:20.0000000", "u2", "m9", "Movie", "Atlas", "DirectPlay", 5390));
         var r = new PbrImporter(store, new FakeItems(), utc).Import(pbr);
         Assert.Equal(1, r.Skipped);
         Assert.Single(store.Since(0, 100));
+    }
+
+    private static PlayRecord Only(PlayStore s) => Assert.Single(s.Since(0, 100));
+
+    [Fact]
+    public void ParsesEmptyCodecsAndNaMethod()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var pbr = Pbr(
+            ("2026-08-01 21:00:20.0000000", "u1", "m1", "Audio", "Song", "Transcode (v: a:mp3)", 200),
+            ("2026-08-02 21:00:20.0000000", "u1", "m2", "Movie", "Film", "na", 200));
+        new PbrImporter(store, new FakeItems(), TimeZoneInfo.Utc).Import(pbr);
+        var plays = store.Since(0, 10);
+        var song = plays.Single(p => p.ItemId == "m1");
+        Assert.Equal("Transcode", song.PlayMethod); Assert.Null(song.VideoCodecTo); Assert.Equal("mp3", song.AudioCodecTo);
+        Assert.Null(plays.Single(p => p.ItemId == "m2").PlayMethod);
+    }
+
+    [Fact]
+    public void BadRowsAreSkippedAndTheRestImported()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var pbr = Pbr(
+            ("not a date", "u1", "m1", "Movie", "Bad", "DirectPlay", 100),
+            ("2026-08-02 21:00:20.0000000", "u1", "m2", "Movie", "Good", "DirectPlay", 100));
+        var r = new PbrImporter(store, new FakeItems(), TimeZoneInfo.Utc).Import(pbr);
+        Assert.Equal(2, r.Read); Assert.Equal(1, r.Imported); Assert.Equal(1, r.Skipped);
+    }
+
+    [Fact]
+    public void ParsesTimestampVariantsAndOffsets()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var paris = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
+        var pbr = Pbr(
+            ("2026-08-02 21:00:20", "u1", "a", "Movie", "A", "DirectPlay", 10),
+            ("2026-08-03T21:00:20Z", "u1", "b", "Movie", "B", "DirectPlay", 10),
+            ("2026-08-04 21:00:20+05:00", "u1", "c", "Movie", "C", "DirectPlay", 10));
+        new PbrImporter(store, new FakeItems(), paris).Import(pbr);
+        var p = store.Since(0, 10).ToDictionary(x => x.ItemId);
+        Assert.Equal(new DateTimeOffset(2026, 8, 2, 19, 0, 0, TimeSpan.Zero), p["a"].StartedAt);       // Paris summer time, local string
+        Assert.Equal(new DateTimeOffset(2026, 8, 3, 21, 0, 0, TimeSpan.Zero), p["b"].StartedAt);       // Z: converted directly
+        Assert.Equal(new DateTimeOffset(2026, 8, 4, 16, 0, 0, TimeSpan.Zero), p["c"].StartedAt);       // offset: converted directly
+    }
+
+    [Fact]
+    public void IdsAreNormalisedToNFormat()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var user = Guid.NewGuid(); var item = Guid.NewGuid();
+        var pbr = Pbr(("2026-08-02 21:00:20.0000000", user.ToString("D"), item.ToString("D"), "Movie", "A", "DirectPlay", 10));
+        new PbrImporter(store, new FakeItems(), TimeZoneInfo.Utc).Import(pbr);
+        var p = Only(store);
+        Assert.Equal(user.ToString("N"), p.UserId); Assert.Equal(item.ToString("N"), p.ItemId);
+    }
+
+    [Fact]
+    public void ReimportDoesNotBumpVersionsOfExistingRows()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var pbr = Pbr(("2026-08-02 21:00:20.0000000", "u1", "m1", "Movie", "A", "DirectPlay", 10), ("2026-08-03 21:00:20.0000000", "u1", "m2", "Movie", "B", "DirectPlay", 10));
+        var importer = new PbrImporter(store, new FakeItems(), TimeZoneInfo.Utc);
+        importer.Import(pbr);
+        var cursor = store.Cursor();
+        var r = importer.Import(pbr);
+        Assert.Equal(cursor, store.Cursor());
+        Assert.Equal(2, r.Skipped);
+    }
+
+    [Fact]
+    public void ItemLookupIsCachedPerImport()
+    {
+        using var t = new TempDb(); var store = new PlayStore(t.Db);
+        var items = new CountingItems();
+        var pbr = Pbr(("2026-08-02 21:00:20.0000000", "u1", "m1", "Movie", "A", "DirectPlay", 10), ("2026-08-03 21:00:20.0000000", "u2", "m1", "Movie", "A", "DirectPlay", 10));
+        new PbrImporter(store, items, TimeZoneInfo.Utc).Import(pbr);
+        Assert.Equal(1, items.Calls);
+    }
+
+    private sealed class CountingItems : IItemLookup
+    {
+        public int Calls;
+        public ItemInfo? Find(string itemId) { Calls++; return null; }
     }
 }
