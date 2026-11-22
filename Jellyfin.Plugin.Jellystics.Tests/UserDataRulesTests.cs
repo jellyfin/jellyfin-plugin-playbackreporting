@@ -56,4 +56,15 @@ public class UserDataRulesTests
 
     [Fact]
     public void ProgressNeverEmits() => Assert.Empty(D(UserDataSaveReason.PlaybackProgress, true, true, (false, false)));
+
+    [Fact]
+    public void ReplayOfAPlayedResumableItemEmitsUnplayedAtStartThenPlayedAtFinish()
+    {
+        // Jellyfin 10.11: Start saves Played=false for resumable video, Finished saves Played=true.
+        Assert.Equal(new[] { "unplayed" }, D(UserDataSaveReason.PlaybackStart, false, false, (true, false)));
+        Assert.Equal(new[] { "played" }, D(UserDataSaveReason.PlaybackFinished, true, false, (false, false)));
+        Assert.Empty(D(UserDataSaveReason.PlaybackStart, false, false, null));   // unknown prior state: stay silent
+        Assert.Empty(D(UserDataSaveReason.PlaybackProgress, false, false, (true, false)));
+        Assert.Empty(D(UserDataSaveReason.PlaybackFinished, false, false, (true, false)));
+    }
 }

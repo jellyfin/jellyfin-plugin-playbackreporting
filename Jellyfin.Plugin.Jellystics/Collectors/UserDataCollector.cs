@@ -24,8 +24,12 @@ internal static class UserDataRules
         switch (reason)
         {
             case UserDataSaveReason.PlaybackFinished:
+                if (played && (!known || !before.Played)) yield return "played";
+                break;
             case UserDataSaveReason.PlaybackStart:
                 if (played && (!known || !before.Played)) yield return "played";
+                // 10.11 saves Played=false at the start of a resumable item: a known-played item becoming unplayed is a real state change.
+                else if (!played && known && before.Played) yield return "unplayed";
                 break;
             case UserDataSaveReason.TogglePlayed:
                 if (played && (!known || !before.Played)) yield return "played";
