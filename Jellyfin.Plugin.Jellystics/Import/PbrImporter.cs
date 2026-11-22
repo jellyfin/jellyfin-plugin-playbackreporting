@@ -60,11 +60,13 @@ public sealed class PbrImporter
     /// Writes its batches straight to the store, deliberately outside the WriteQueue (a long import must not starve live plays);
     /// the single SQLite writer lock is shared through the connection busy_timeout, so both sides wait for each other briefly.
     /// </remarks>
+    private readonly record struct Row(long RowId, string? Date, string User, string Item, string? ItemType, string? ItemName, string? Method, string? Client, string? Device, long Seconds);
+
     public PbrImportResult Import(string dbPath, IProgress<int>? progress = null, CancellationToken ct = default)
     {
         int read = 0, imported = 0, skipped = 0, repaired = 0;
-        var batch = new List<PlayRecord>(BatchSize);
         var cache = new Dictionary<string, ItemInfo?>();
+        var chunk = new List<Row>(BatchSize);
 
         using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = dbPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         c.Open();
@@ -77,50 +79,62 @@ public sealed class PbrImporter
             read++;
             try
             {
-                var rowId = r.GetInt64(0);
-                var id = "pbr-" + rowId;
-                // Re-imports leave existing rows alone (an upsert would bump their Version and make sync consumers re-read them).
-                if (_store.Get(id) is not null) { skipped++; continue; }
-
-                var userId = NormalizeId(r.IsDBNull(2) ? string.Empty : r.GetString(2));
-                var itemId = NormalizeId(r.IsDBNull(3) ? string.Empty : r.GetString(3));
-                var started = ParseStart(r.GetString(1)).AddSeconds(-20);
-
-                if (!cache.TryGetValue(itemId, out var info)) cache[itemId] = info = _items.Find(itemId);
-                var rawSeconds = r.IsDBNull(9) ? 0 : r.GetInt64(9);
-                var seconds = DurationRepair.RepairSeconds(rawSeconds, info?.RunTimeTicks);
-                var end = started.AddSeconds(seconds);
-
-                if (_store.ExistsOverlapping(userId, itemId, started, end, PlaySources.Plugin)) { skipped++; continue; }
-
-                if (seconds != rawSeconds) repaired++;
-                var play = new PlayRecord
-                {
-                    Id = id, UserId = userId, ItemId = itemId, ItemName = r.IsDBNull(5) ? null : r.GetString(5),
-                    ItemType = info?.ItemType ?? (r.IsDBNull(4) ? null : r.GetString(4)), RunTimeTicks = info?.RunTimeTicks,
-                    SeriesId = info?.SeriesId, SeriesName = info?.SeriesName, SeasonId = info?.SeasonId, AlbumId = info?.AlbumId, AlbumName = info?.AlbumName,
-                    ParentIndexNumber = info?.ParentIndexNumber, IndexNumber = info?.IndexNumber, LibraryId = info?.LibraryId,
-                    StartedAt = started, EndedAt = end, LastEventAt = end, WatchedMs = seconds * 1000,
-                    Client = r.IsDBNull(7) ? null : r.GetString(7), DeviceName = r.IsDBNull(8) ? null : r.GetString(8),
-                    State = PlayStates.Closed, Source = PlaySources.ImportPbr,
-                };
-                ApplyMethod(play, r.IsDBNull(6) ? null : r.GetString(6));
-                batch.Add(play);
-                imported++;
-                if (batch.Count >= BatchSize) { _store.Upsert(batch); batch.Clear(); }
+                chunk.Add(new Row(r.GetInt64(0), r.IsDBNull(1) ? null : r.GetString(1), r.IsDBNull(2) ? string.Empty : r.GetString(2), r.IsDBNull(3) ? string.Empty : r.GetString(3),
+                    r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? null : r.GetString(6),
+                    r.IsDBNull(7) ? null : r.GetString(7), r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? 0 : r.GetInt64(9)));
             }
-            catch (Exception ex) when (ex is FormatException or InvalidCastException or ArgumentException or OverflowException)
-            {
-                skipped++;   // a malformed row must not abort the whole import
-            }
-            finally
-            {
-                if (read % 100 == 0) progress?.Report(read);
-            }
+            catch (InvalidCastException) { skipped++; }
+            if (chunk.Count >= BatchSize) { Flush(); progress?.Report(read); }
         }
-        if (batch.Count > 0) _store.Upsert(batch);
+        Flush();
         progress?.Report(read);
         return new PbrImportResult(read, imported, skipped, repaired);
+
+        void Flush()
+        {
+            if (chunk.Count == 0) return;
+            // One IN query for the whole chunk: re-imports leave existing rows alone (an upsert would bump their Version and make sync consumers re-read them).
+            var existing = _store.ExistingIds(chunk.Select(x => "pbr-" + x.RowId));
+            var batch = new List<PlayRecord>(chunk.Count);
+            foreach (var row in chunk)
+            {
+                try
+                {
+                    var id = "pbr-" + row.RowId;
+                    if (existing.Contains(id)) { skipped++; continue; }
+                    var userId = NormalizeId(row.User);
+                    var itemId = NormalizeId(row.Item);
+                    var started = ParseStart(row.Date ?? throw new FormatException("no date")).AddSeconds(-20);
+
+                    if (!cache.TryGetValue(itemId, out var info)) cache[itemId] = info = _items.Find(itemId);
+                    var seconds = DurationRepair.RepairSeconds(row.Seconds, info?.RunTimeTicks);
+                    var end = started.AddSeconds(seconds);
+
+                    if (_store.ExistsOverlapping(userId, itemId, started, end, PlaySources.Plugin)) { skipped++; continue; }
+
+                    if (seconds != row.Seconds) repaired++;
+                    var play = new PlayRecord
+                    {
+                        Id = id, UserId = userId, ItemId = itemId, ItemName = row.ItemName,
+                        ItemType = info?.ItemType ?? row.ItemType, RunTimeTicks = info?.RunTimeTicks,
+                        SeriesId = info?.SeriesId, SeriesName = info?.SeriesName, SeasonId = info?.SeasonId, AlbumId = info?.AlbumId, AlbumName = info?.AlbumName,
+                        ParentIndexNumber = info?.ParentIndexNumber, IndexNumber = info?.IndexNumber, LibraryId = info?.LibraryId,
+                        StartedAt = started, EndedAt = end, LastEventAt = end, WatchedMs = seconds * 1000,
+                        Client = row.Client, DeviceName = row.Device,
+                        State = PlayStates.Closed, Source = PlaySources.ImportPbr,
+                    };
+                    ApplyMethod(play, row.Method);
+                    batch.Add(play);
+                    imported++;
+                }
+                catch (Exception ex) when (ex is FormatException or ArgumentException or OverflowException)
+                {
+                    skipped++;   // a malformed row must not abort the whole import
+                }
+            }
+            _store.Upsert(batch);
+            chunk.Clear();
+        }
     }
 
     private static string NormalizeId(string id) => Guid.TryParse(id, out var g) ? g.ToString("N") : id;

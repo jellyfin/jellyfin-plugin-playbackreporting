@@ -19,10 +19,19 @@ public sealed class PlayRecordFactory
     private readonly ILibraryManager _library;
     private readonly IMediaSourceManager _mediaSources;
     // Media streams of the items being played: queried once, evicted when the play closes (FinalizeClosed).
-    private readonly ConcurrentDictionary<Guid, IReadOnlyList<MediaStream>> _streams = new();
+    private readonly ConcurrentDictionary<Guid, StreamEntry> _streams = new();
+    private readonly IClock _clock;
 
-    public PlayRecordFactory(ILibraryManager library, IMediaSourceManager mediaSources)
+    private sealed class StreamEntry
     {
+        public StreamEntry(IReadOnlyList<MediaStream> list, DateTimeOffset at) { List = list; LastUsed = at; }
+        public IReadOnlyList<MediaStream> List { get; }
+        public DateTimeOffset LastUsed { get; set; }
+    }
+
+    public PlayRecordFactory(ILibraryManager library, IMediaSourceManager mediaSources, IClock? clock = null)
+    {
+        _clock = clock ?? new SystemClock();
         _library = library;
         _mediaSources = mediaSources;
     }
@@ -139,9 +148,21 @@ public sealed class PlayRecordFactory
         _streams.TryRemove(itemId, out _);
     }
 
-    private IReadOnlyList<MediaStream> Streams(Guid itemId) => _streams.GetOrAdd(itemId, id =>
+    /// <summary>Drops cached streams not used for <paramref name="idle"/>: a late event for a play that was just closed can re-populate an entry nothing else evicts.</summary>
+    public void EvictIdle(TimeSpan idle)
     {
-        try { return _mediaSources.GetMediaStreams(id); }
-        catch (ArgumentException) { return Array.Empty<MediaStream>(); }
-    });
+        var now = _clock.UtcNow;
+        foreach (var (id, entry) in _streams) if (now - entry.LastUsed > idle) _streams.TryRemove(id, out _);
+    }
+
+    private IReadOnlyList<MediaStream> Streams(Guid itemId)
+    {
+        var entry = _streams.GetOrAdd(itemId, id =>
+        {
+            try { return new StreamEntry(_mediaSources.GetMediaStreams(id), _clock.UtcNow); }
+            catch (ArgumentException) { return new StreamEntry(Array.Empty<MediaStream>(), _clock.UtcNow); }
+        });
+        entry.LastUsed = _clock.UtcNow;
+        return entry.List;
+    }
 }

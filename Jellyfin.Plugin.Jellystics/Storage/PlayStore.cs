@@ -65,6 +65,22 @@ public sealed class PlayStore
         return (long)cmd.ExecuteScalar()!;
     }
 
+    /// <summary>Which of the given ids exist, in chunks of 500 (one IN query per chunk).</summary>
+    public HashSet<string> ExistingIds(IEnumerable<string> ids)
+    {
+        var found = new HashSet<string>();
+        using var c = _db.Open();
+        foreach (var chunk in ids.Distinct().Chunk(500))
+        {
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = $"SELECT Id FROM Plays WHERE Id IN ({string.Join(",", chunk.Select((_, i) => "$p" + i))})";
+            for (var i = 0; i < chunk.Length; i++) cmd.Parameters.AddWithValue("$p" + i, chunk[i]);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) found.Add(r.GetString(0));
+        }
+        return found;
+    }
+
     public long Cursor() { using var c = _db.Open(); return JellysticsDb.CurrentVersion(c); }
 
     /// <summary>Closes plays left open (crash / restart) at their last event. Returns how many.</summary>

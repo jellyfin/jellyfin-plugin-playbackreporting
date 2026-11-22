@@ -159,4 +159,23 @@ public class PlayRecordFactoryTests
         var ev = f.ToEvent(e, PlayEventKind.Progress, default);
         Assert.Equal("fre", ev.AudioLanguage); Assert.Equal("fre", ev.SubtitleLanguage);
     }
+
+    [Fact]
+    public void IdleStreamCachesAreEvictedBySweep()
+    {
+        var clock = new TestClock();
+        var calls = new int[1];
+        var ms = Stub<IMediaSourceManager>.Create((m, _) => { if (m.Name == "GetMediaStreams") { calls[0]++; return Streams(); } return null; });
+        var f = new PlayRecordFactory(Stub<ILibraryManager>.Create((_, _) => null), ms, clock);
+        var e = Args(new Movie { Id = Guid.NewGuid() }, Session(null));
+        f.ToEvent(e, PlayEventKind.Progress, default);
+        clock.Advance(TimeSpan.FromMinutes(5));
+        f.EvictIdle(TimeSpan.FromMinutes(10));
+        f.ToEvent(e, PlayEventKind.Progress, default);          // still cached, and refreshes its last use
+        Assert.Equal(1, calls[0]);
+        clock.Advance(TimeSpan.FromMinutes(11));
+        f.EvictIdle(TimeSpan.FromMinutes(10));
+        f.ToEvent(e, PlayEventKind.Progress, default);
+        Assert.Equal(2, calls[0]);
+    }
 }

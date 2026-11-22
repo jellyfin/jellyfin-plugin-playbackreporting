@@ -36,7 +36,7 @@ public sealed class PlaybackCollector : IHostedService, IDisposable
         _sessions.PlaybackProgress += OnProgress;
         _sessions.PlaybackStopped += OnStopped;
         _checkpoint = new Timer(_ => Guarded("checkpoint", () => Persist(_registry.TakeDirtyOpen())), null, CheckpointEvery, CheckpointEvery);
-        _sweep = new Timer(_ => Guarded("sweep", () => Persist(_registry.Sweep())), null, SweepEvery, SweepEvery);
+        _sweep = new Timer(_ => Guarded("sweep", () => { Persist(_registry.Sweep()); _factory.EvictIdle(TimeSpan.FromMinutes(10)); }), null, SweepEvery, SweepEvery);
         return Task.CompletedTask;
     }
 

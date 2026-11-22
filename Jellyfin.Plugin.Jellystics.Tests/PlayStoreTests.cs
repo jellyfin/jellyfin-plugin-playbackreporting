@@ -115,4 +115,17 @@ public class PlayStoreTests
         s.Upsert(new[] { Play("c", d) });
         Assert.Equal("c", Assert.Single(s.Since(page[^1].Version, 10)).Id);
     }
+
+    [Fact]
+    public void ExistingIdsReturnsOnlyKnownIdsInOneQuery()
+    {
+        using var t = new TempDb();
+        var store = new PlayStore(t.Db);
+        var start = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero);
+        store.Upsert(new[] { Play("a", start), Play("b", start) });
+        Assert.Equal(new[] { "a", "b" }, store.ExistingIds(new[] { "a", "b", "zz" }).Order());
+        Assert.Empty(store.ExistingIds(Array.Empty<string>()));
+        var many = Enumerable.Range(0, 1500).Select(i => "x" + i).Append("a").ToList();   // beyond SQLite's parameter limit per statement
+        Assert.Equal(new[] { "a" }, store.ExistingIds(many));
+    }
 }
