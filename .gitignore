@@ -224,3 +224,9 @@ pip-log.txt
 .mr.developer.cfg
 artifacts
 .idea
+
+# Planning docs (local only)
+docs/superpowers/
+
+config/
+media/

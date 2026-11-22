@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Jellystics</title>
+</head>
+<body>
+  <div id="JellysticsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+    data-require="emby-input,emby-button" data-controller="__plugin/JellysticsConfig">
+    <div data-role="content">
+      <div class="content-primary">
+
+        <div class="verticalSection">
+          <h2 class="sectionTitle">Jellystics</h2>
+          <p>Records every playback from Jellyfin events and keeps the full history that Jellystics syncs from.</p>
+        </div>
+
+        <div class="verticalSection">
+          <h3 class="sectionTitle">Status</h3>
+          <p id="pluginStatus" class="fieldDescription">Loading...</p>
+        </div>
+
+        <div class="verticalSection">
+          <h3 class="sectionTitle">Import history</h3>
+          <p>Import the history of the official Playback Reporting plugin (read-only, safe to run several times).</p>
+          <div class="inputContainer">
+            <input is="emby-input" type="text" id="pbrDbPath" label="Path of playback_reporting.db" />
+            <div class="fieldDescription">Leave empty to use the default location in the Jellyfin data folder.</div>
+          </div>
+          <button is="emby-button" type="button" id="saveButton" class="raised button-submit block">
+            <span>Save</span>
+          </button>
+          <button is="emby-button" type="button" id="importButton" class="raised block">
+            <span>Import history</span>
+          </button>
+          <p id="importStatus" class="fieldDescription">Status: idle</p>
+        </div>
+
+        <div class="verticalSection">
+          <h3 class="sectionTitle">Purge plays before</h3>
+          <p>Permanently deletes the closed plays that started before the chosen date. The purge is local to the plugin: it is not propagated to Jellystics, and importing Playback Reporting again restores the purged rows that come from it.</p>
+          <div class="inputContainer">
+            <input is="emby-input" type="date" id="purgeDate" label="Date" />
+          </div>
+          <button is="emby-button" type="button" id="purgeButton" class="raised block">
+            <span>Purge plays before this date</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
