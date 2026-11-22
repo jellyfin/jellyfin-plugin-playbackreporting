@@ -23,12 +23,13 @@ jobs:
       - name: Get version from tag
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          # Jellyfin wants four numeric parts
-          case "$TAG" in
-            *.*.*.*) VERSION="$TAG" ;;
-            *) VERSION="$TAG.0" ;;
-          esac
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Tags must be vX.Y.Z.W: Jellyfin versions have four parts, and the
+          # manifest sourceUrl is built from this same tag.
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag must look like v0.1.0.0 (four numbers), got v$TAG"
+            exit 1
+          fi
+          echo "VERSION=$TAG" >> $GITHUB_ENV
 
       - name: Set version
         run: |
@@ -55,11 +56,6 @@ jobs:
           git checkout -- Directory.Build.props   # the version edit was only for the build
           git checkout -B master origin/master
 
-          if jq -e --arg v "$VERSION" '.[0].versions | any(.version == $v)' manifest.json > /dev/null; then
-            echo "manifest already lists $VERSION, nothing to commit"
-            exit 0
-          fi
-
           cat <<EOF > new_version.json
           {
             "checksum": "${MD5}",
@@ -71,12 +67,19 @@ jobs:
           }
           EOF
 
-          jq '.[0].versions = ([input] + .[0].versions)' manifest.json new_version.json > manifest.tmp && mv manifest.tmp manifest.json
+          # Replace any existing entry for this version (a re-run rebuilds the zip,
+          # so its checksum changes) and put the new one first.
+          jq --arg v "$VERSION" '.[0].versions = ([input] + (.[0].versions | map(select(.version != $v))))' \
+            manifest.json new_version.json > manifest.tmp && mv manifest.tmp manifest.json
           rm new_version.json
 
           git add manifest.json
-          git commit -m "chore: update manifest for v${VERSION}"
-          git push origin master
+          if git diff --cached --quiet; then
+            echo "manifest unchanged"
+          else
+            git commit -m "chore: update manifest for v${VERSION}"
+            git push origin master
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -84,6 +87,7 @@ jobs:
           files: ${{ env.ZIP }}
           fail_on_unmatched_files: true
           overwrite_files: true
+          tag_name: v${{ env.VERSION }}
           name: v${{ env.VERSION }}
           draft: false
           prerelease: false
