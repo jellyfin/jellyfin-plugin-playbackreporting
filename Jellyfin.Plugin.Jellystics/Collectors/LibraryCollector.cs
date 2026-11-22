@@ -36,7 +36,8 @@ public sealed class LibraryCollector : IHostedService
     {
         _library.ItemAdded += OnAdded;
         _library.ItemRemoved += OnRemoved;
-        if (_store.GetMeta(SnapshotFlag) is null) _ = Task.Run(Snapshot);   // off the startup path; only batch writes go through the queue
+        try { if (_store.GetMeta(SnapshotFlag) is null) _ = Task.Run(Snapshot); }   // off the startup path; only batch writes go through the queue
+        catch (Exception ex) { _logger.LogError(ex, "Jellystics catalog snapshot could not start"); }   // never keep Jellyfin from starting
         return Task.CompletedTask;
     }
 
@@ -78,7 +79,8 @@ public sealed class LibraryCollector : IHostedService
             {
                 var page = _library.GetItemList(new InternalItemsQuery
                 {
-                    IncludeItemTypes = Kept, Recursive = true, IsVirtualItem = false, HasOwnerId = false,
+                    IncludeItemTypes = Kept, Recursive = true, IsVirtualItem = false,   // HasOwnerId=false returns nothing in 10.11: extras are filtered by IsKept (ExtraType)
+                   
                     StartIndex = start, Limit = PageSize, DtoOptions = new DtoOptions(false),
                     OrderBy = new[] { (ItemSortBy.DateCreated, Jellyfin.Database.Implementations.Enums.SortOrder.Ascending), (ItemSortBy.SortName, Jellyfin.Database.Implementations.Enums.SortOrder.Ascending) },
                 });
