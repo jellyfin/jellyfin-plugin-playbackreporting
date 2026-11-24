@@ -16,11 +16,20 @@ Based on jellyfin-plugin-playbackreporting (GPL-3).
 
 Dashboard > Plugins > Jellystics can delete closed plays older than a date. The purge is local to the plugin: it is not propagated to Jellystics, and importing the official Playback Reporting history again restores purged rows that came from it.
 
+## My statistics page
+
+Every Jellyfin user gets a "My statistics" entry in the avatar menu (2nd, after Profile). It opens `/Jellystics/Me/`, a page served by Jellystics through the plugin, showing only that user's statistics.
+
+- Jellystics links itself: on sync it calls `POST /Jellystics/Link` (admin) with its URL as seen from Jellyfin and a secret. Dashboard > Plugins > Jellystics shows the link and reachability, and has a URL override for when the pushed address is wrong.
+- The browser only talks to Jellyfin. `/Jellystics/Me/api/*` requires a Jellyfin login; the plugin forwards to Jellystics `/api/me/*` with the secret and the user id taken from the Jellyfin authentication (`X-Jellystics-Secret`, `X-Jellystics-User`), never from the browser.
+- When Jellystics is not linked or not reachable the page shows a "Statistics unavailable" notice.
+- The menu entry comes from a small script (`/Jellystics/Me/client.js`) injected into jellyfin-web's `index.html`.
+
 ## Development
 
-Requires the Nix dev shell (`nix develop`, or direnv): dotnet 9, go-task, docker, sqlite.
+Requires the Nix dev shell (`nix develop`, or direnv): dotnet 9, node, go-task, docker, sqlite.
 
-- `task test` runs the unit tests.
+- `task test` runs the unit tests (xUnit, then `node --test` for the pure helpers of `client.js`).
 - `task build` builds the plugin, copies the dll to `config/plugins/Jellystics/` and restarts the dev Jellyfin (`docker compose up -d`, http://localhost:8097, container `jellystics-plugin-jellyfin`). `config/` and `media/` are git-ignored.
 
 ### Manual end-to-end check
