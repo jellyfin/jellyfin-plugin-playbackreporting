@@ -7,6 +7,7 @@ using MediaBrowser.Controller;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Events.Authentication;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.Jellystics;
@@ -40,5 +41,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHttpClient();
         serviceCollection.AddSingleton<IMeSettings, PluginMeSettings>();
         serviceCollection.AddSingleton<MeLink>();
+        serviceCollection.AddSingleton<IStartupFilter, ScriptInjectorStartup>();
     }
 }
