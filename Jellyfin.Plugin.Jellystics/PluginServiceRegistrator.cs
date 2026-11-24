@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.Jellystics.Collectors;
 using Jellyfin.Plugin.Jellystics.Import;
+using Jellyfin.Plugin.Jellystics.Me;
 using Jellyfin.Plugin.Jellystics.Storage;
 using Jellyfin.Plugin.Jellystics.Tracking;
 using MediaBrowser.Controller;
@@ -36,5 +37,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(sp => new ImportJobs((path, progress) => sp.GetRequiredService<PbrImporter>().Import(path, progress)));
         serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, LoginSucceededConsumer>();
         serviceCollection.AddScoped<IEventConsumer<AuthenticationRequestEventArgs>, LoginFailedConsumer>();
+        serviceCollection.AddHttpClient();
+        serviceCollection.AddSingleton<IMeSettings, PluginMeSettings>();
+        serviceCollection.AddSingleton<MeLink>();
     }
 }

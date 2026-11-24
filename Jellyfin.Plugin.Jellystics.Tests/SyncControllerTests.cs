@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Jellyfin.Plugin.Jellystics.Api;
 using Jellyfin.Plugin.Jellystics.Import;
+using Jellyfin.Plugin.Jellystics.Me;
 using Jellyfin.Plugin.Jellystics.Models;
 using Jellyfin.Plugin.Jellystics.Storage;
 using Microsoft.AspNetCore.Authorization;
@@ -28,7 +29,7 @@ public class SyncControllerTests
         {
             Plays = new PlayStore(Db.Db); Annex = new AnnexStore(Db.Db);
             Queue.StartAsync(CancellationToken.None).Wait();
-            Controller = new SyncController(Plays, Annex, Queue);
+            Controller = new SyncController(Plays, Annex, Queue, new MeLink(new FakeMeSettings(), new FakeHttp((_, _) => throw new HttpRequestException("offline"))));
         }
 
         public void Dispose() { Queue.StopAsync(CancellationToken.None).Wait(); Db.Dispose(); }

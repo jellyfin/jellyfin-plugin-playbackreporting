@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Jellyfin.Plugin.Jellystics.Me;
 using Jellyfin.Plugin.Jellystics.Models;
 using Jellyfin.Plugin.Jellystics.Storage;
 using Microsoft.AspNetCore.Authorization;
@@ -29,23 +30,44 @@ public class SyncController : ControllerBase
     private readonly PlayStore _plays;
     private readonly AnnexStore _annex;
     private readonly WriteQueue _queue;
+    private readonly MeLink _link;
 
-    public SyncController(PlayStore plays, AnnexStore annex, WriteQueue queue)
+    public SyncController(PlayStore plays, AnnexStore annex, WriteQueue queue, MeLink link)
     {
-        _plays = plays; _annex = annex; _queue = queue;
+        _plays = plays; _annex = annex; _queue = queue; _link = link;
     }
 
     [HttpGet("Info")]
-    public IActionResult Info() => Camel(new
+    public IActionResult Info()
     {
-        pluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.0.0.0",
-        schemaVersion = SchemaVersion,
-        cursor = _plays.Cursor(),   // global max Version (one counter shared by every table)
-        databaseId = _annex.GetMeta(JellysticsDb.DatabaseIdKey),   // changes when the database is recreated (reinstall, lost db)
-        firstPlayAt = _plays.FirstPlayAt(),
-        counts = new { plays = _plays.Count(), libraryEvents = _annex.CountLibrary(), userDataEvents = _annex.CountUserData(), logins = _annex.CountLogins() },
-        serverTimeZone = TimeZoneInfo.Local.Id,
-    });
+        _link.EnsureCheckedInBackground();
+        return Camel(new
+        {
+            pluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.0.0.0",
+            schemaVersion = SchemaVersion,
+            cursor = _plays.Cursor(),   // global max Version (one counter shared by every table)
+            databaseId = _annex.GetMeta(JellysticsDb.DatabaseIdKey),   // changes when the database is recreated (reinstall, lost db)
+            firstPlayAt = _plays.FirstPlayAt(),
+            counts = new { plays = _plays.Count(), libraryEvents = _annex.CountLibrary(), userDataEvents = _annex.CountUserData(), logins = _annex.CountLogins() },
+            serverTimeZone = TimeZoneInfo.Local.Id,
+            meLinked = _link.IsLinked,   // url and secret known (pushed by POST /Jellystics/Link)
+            meReachable = _link.Reachable,   // last GET {url}/api/me/health result, null = not checked yet
+        });
+    }
+
+    /// <summary>Jellystics pushes its URL (as seen from Jellyfin) and the /api/me secret; the plugin stores them and checks the health endpoint.</summary>
+    [HttpPost("Link")]
+    public async Task<IActionResult> Link()
+    {
+        LinkRequest? request;
+        try { request = await JsonSerializer.DeserializeAsync<LinkRequest>(Request.Body, JsonOptions).ConfigureAwait(false); }
+        catch (JsonException) { return BadRequest(new { error = "Invalid JSON" }); }
+        if (request is null) return BadRequest(new { error = "Body must be {\"url\": \"...\", \"secret\": \"...\"}" });
+        var error = _link.Save(request.Url, request.Secret);
+        if (error is not null) return BadRequest(new { error });
+        var reachable = await _link.CheckHealthAsync(HttpContext?.RequestAborted ?? CancellationToken.None).ConfigureAwait(false);
+        return Camel(new { linked = true, reachable });
+    }
 
     [HttpGet("Plays")]
     public IActionResult Plays([FromQuery] long since = 0, [FromQuery] int? limit = null) => Page(since, limit, _plays.Since);
@@ -131,6 +153,13 @@ public class SyncController : ControllerBase
     public sealed class ImportPlaysRequest
     {
         public List<PlayRecord?>? Items { get; set; }
+    }
+
+    public sealed class LinkRequest
+    {
+        public string? Url { get; set; }
+
+        public string? Secret { get; set; }
     }
 }
 
