@@ -14,9 +14,10 @@ tasks:
       - docker restart jellystics-plugin-jellyfin
 
   test:
-    desc: Run the unit tests
+    desc: Run the unit tests (xUnit and the client.js node tests)
     cmds:
       - dotnet test
+      - node --test 'Jellyfin.Plugin.Jellystics.Tests/js/*.test.js'
 
   clean:
     desc: Remove build output and the deployed plugin
