@@ -51,7 +51,10 @@ public class SyncController : ControllerBase
             counts = new { plays = _plays.Count(), libraryEvents = _annex.CountLibrary(), userDataEvents = _annex.CountUserData(), logins = _annex.CountLogins() },
             serverTimeZone = TimeZoneInfo.Local.Id,
             meLinked = _link.IsLinked,   // url and secret known (pushed by POST /Jellystics/Link)
-            meReachable = _link.Reachable,   // last GET {url}/api/me/health result, null = not checked yet
+            meReachable = _link.Reachable,   // last health / relay result, null = not checked yet; false for unreachable and secretMismatch
+            meError = _link.Error,   // null, "unreachable" or "secretMismatch" (Jellystics answered 401: re-push the link)
+            meLinkedUrl = _link.LinkedUrl,   // url last pushed by Jellystics (never the override)
+            meSecretFingerprint = _link.SecretFingerprint,   // first 16 hex of SHA-256(secret); the secret itself is never returned
         });
     }
 
@@ -66,7 +69,21 @@ public class SyncController : ControllerBase
         var error = _link.Save(request.Url, request.Secret);
         if (error is not null) return BadRequest(new { error });
         var reachable = await _link.CheckHealthAsync(HttpContext?.RequestAborted ?? CancellationToken.None).ConfigureAwait(false);
-        return Camel(new { linked = true, reachable });
+        return Camel(new { linked = true, reachable, error = _link.Error });
+    }
+
+    /// <summary>Admin override of the Jellystics URL ("" clears it). Changes only that field, then checks the health endpoint.</summary>
+    [HttpPost("LinkOverride")]
+    public async Task<IActionResult> LinkOverride()
+    {
+        LinkOverrideRequest? request;
+        try { request = await JsonSerializer.DeserializeAsync<LinkOverrideRequest>(Request.Body, JsonOptions).ConfigureAwait(false); }
+        catch (JsonException) { return BadRequest(new { error = "Invalid JSON" }); }
+        if (request is null) return BadRequest(new { error = "Body must be {\"url\": \"...\"}" });
+        var error = _link.SaveOverride(request.Url);
+        if (error is not null) return BadRequest(new { error });
+        bool? reachable = _link.IsLinked ? await _link.CheckHealthAsync(HttpContext?.RequestAborted ?? CancellationToken.None).ConfigureAwait(false) : null;
+        return Camel(new { saved = true, effectiveUrl = _link.EffectiveUrl, linked = _link.IsLinked, reachable, error = _link.Error });
     }
 
     [HttpGet("Plays")]
@@ -153,6 +170,11 @@ public class SyncController : ControllerBase
     public sealed class ImportPlaysRequest
     {
         public List<PlayRecord?>? Items { get; set; }
+    }
+
+    public sealed class LinkOverrideRequest
+    {
+        public string? Url { get; set; }
     }
 
     public sealed class LinkRequest

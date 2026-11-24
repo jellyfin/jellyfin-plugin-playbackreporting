@@ -12,6 +12,8 @@ internal sealed class FakeMeSettings : IMeSettings
 
     public int Saves { get; private set; }
 
+    public void SaveOverride(string url) => UrlOverride = url;
+
     public void SaveLink(string url, string secret)
     {
         Url = url; Secret = secret; Saves++;
@@ -62,5 +64,34 @@ internal sealed class FakeHttp : IHttpClientFactory
             lock (_owner.Requests) _owner.Requests.Add(new Recorded(request.Method, request.RequestUri!, headers));
             return _respond(request, cancellationToken);
         }
+    }
+}
+
+internal static class ResultRunner
+{
+    internal sealed record Executed(int Status, Dictionary<string, string> Headers, string Body, bool Aborted);
+
+    /// <summary>Executes an action result against a fresh HttpContext and returns what the client would get.</summary>
+    public static Executed Exec(Microsoft.AspNetCore.Mvc.IActionResult result, string method = "GET")
+    {
+        var ctx = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        ctx.Request.Method = method;
+        var lifetime = new Lifetime();
+        ctx.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature>(lifetime);
+        var body = new MemoryStream();
+        ctx.Response.Body = body;
+        result.ExecuteResultAsync(new Microsoft.AspNetCore.Mvc.ActionContext { HttpContext = ctx }).GetAwaiter().GetResult();
+        var headers = ctx.Response.Headers.ToDictionary(h => h.Key, h => h.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        if (ctx.Response.ContentType is not null) headers["Content-Type"] = ctx.Response.ContentType;
+        return new Executed(ctx.Response.StatusCode, headers, System.Text.Encoding.UTF8.GetString(body.ToArray()), lifetime.Aborted);
+    }
+
+    private sealed class Lifetime : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
+    {
+        public CancellationToken RequestAborted { get; set; } = CancellationToken.None;
+
+        public bool Aborted { get; private set; }
+
+        public void Abort() => Aborted = true;
     }
 }

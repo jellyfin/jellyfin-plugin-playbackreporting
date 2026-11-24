@@ -24,6 +24,16 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <summary>Gets Jellyfin's data directory (where the official playback_reporting.db lives).</summary>
     public string AppDataPath { get; }
 
+    /// <summary>Generic configuration saves never change the link fields (see PluginConfiguration.KeepLinkFields).</summary>
+    public override void UpdateConfiguration(BasePluginConfiguration configuration)
+    {
+        lock (Me.PluginMeSettings.Gate)
+        {
+            if (configuration is PluginConfiguration incoming) PluginConfiguration.KeepLinkFields(incoming, Configuration);
+            base.UpdateConfiguration(configuration);
+        }
+    }
+
     public IEnumerable<PluginPageInfo> GetPages() => new[]
     {
         new PluginPageInfo { Name = "Jellystics", DisplayName = "Jellystics", EnableInMainMenu = true, MenuSection = "server", MenuIcon = "insights", EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html" },

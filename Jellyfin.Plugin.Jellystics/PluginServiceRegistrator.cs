@@ -38,7 +38,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(sp => new ImportJobs((path, progress) => sp.GetRequiredService<PbrImporter>().Import(path, progress)));
         serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, LoginSucceededConsumer>();
         serviceCollection.AddScoped<IEventConsumer<AuthenticationRequestEventArgs>, LoginFailedConsumer>();
-        serviceCollection.AddHttpClient();
+        MeLink.AddHttpClient(serviceCollection);
         serviceCollection.AddSingleton<IMeSettings, PluginMeSettings>();
         serviceCollection.AddSingleton<MeLink>();
         serviceCollection.AddSingleton<IStartupFilter, ScriptInjectorStartup>();
