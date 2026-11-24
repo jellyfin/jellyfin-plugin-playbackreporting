@@ -13,7 +13,6 @@ export default function (view) {
   const meUrlOverride = view.querySelector("#meUrlOverride");
   const saveMeButton = view.querySelector("#saveMeButton");
   let pollTimer = null;
-  let pushedUrl = "";
   let lastInfo = null;
 
   function isHttpUrl(value) {
@@ -26,21 +25,29 @@ export default function (view) {
   }
 
   function renderMeStatus() {
-    const override = meUrlOverride.value.trim();
-    const effective = override && isHttpUrl(override) ? override : pushedUrl;
     if (!lastInfo) {
       meStatus.textContent = "Loading...";
-    } else if (!lastInfo.meLinked) {
-      meStatus.textContent = "Not linked: Jellystics has not pushed its address yet (it does on its next plugin sync).";
-    } else {
-      const reach = lastInfo.meReachable === true
-        ? "reachable"
-        : lastInfo.meReachable === false
-          ? "UNREACHABLE from Jellyfin (set the override below)"
-          : "reachability being checked";
-      meStatus.textContent = "Linked to " + effective +
-        (override ? " (override; URL pushed by Jellystics: " + (pushedUrl || "none") + ")" : "") + " / " + reach;
+      return;
     }
+    if (!lastInfo.meLinked) {
+      meStatus.textContent = "Not linked: Jellystics has not pushed its address yet (it does on its next plugin sync).";
+      return;
+    }
+    const override = meUrlOverride.value.trim();
+    const pushed = lastInfo.meLinkedUrl || "none";
+    const target = override && isHttpUrl(override) ? override + " (override; URL pushed by Jellystics: " + pushed + ")" : pushed;
+    let state;
+    if (lastInfo.meError === "secretMismatch") {
+      state = "Jellystics rejected the shared secret. Jellystics will re-link automatically at its next sync (within a minute); " +
+        "if it persists, check that only one Jellystics instance targets this server.";
+    } else if (lastInfo.meError === "unreachable" || lastInfo.meReachable === false) {
+      state = "UNREACHABLE from Jellyfin: set the URL override below to an address of Jellystics that the Jellyfin server can reach.";
+    } else if (lastInfo.meReachable === true) {
+      state = "reachable";
+    } else {
+      state = "reachability being checked";
+    }
+    meStatus.textContent = "Linked to " + target + " / " + state;
   }
 
   function renderStatus(s) {
@@ -102,23 +109,18 @@ export default function (view) {
       .then(function (config) {
         pathInput.value = config.PbrDbPath || "";
         meUrlOverride.value = config.JellysticsUrlOverride || "";
-        pushedUrl = config.JellysticsUrl || "";
         renderMeStatus();
       })
       .finally(Dashboard.hideLoadingMsg);
   }
 
+  // The link fields (URL, secret, override) are never written through this generic save: the server keeps them
+  // (Plugin.UpdateConfiguration), so a Link pushed meanwhile cannot be overwritten. The override has its own endpoint.
   function saveConfig() {
-    const override = meUrlOverride.value.trim();
-    if (override && !isHttpUrl(override)) {
-      Dashboard.alert({ message: "The Jellystics URL override must be an absolute http or https URL.", title: "Error" });
-      return Promise.reject(new Error("invalid override"));
-    }
     Dashboard.showLoadingMsg();
     return ApiClient.getPluginConfiguration(JellysticsConfig.pluginUniqueId)
       .then(function (config) {
         config.PbrDbPath = pathInput.value.trim();
-        config.JellysticsUrlOverride = override;
         return ApiClient.updatePluginConfiguration(JellysticsConfig.pluginUniqueId, config);
       })
       .then(Dashboard.processPluginConfigurationUpdateResult)
@@ -146,14 +148,32 @@ export default function (view) {
 
   saveMeButton.addEventListener("click", function (e) {
     e.preventDefault();
-    saveConfig()
-      .then(function () {
-        // Info starts a health check of the new URL when its reachability is unknown.
-        loadInfo();
-        setTimeout(loadInfo, 2000);
-      })
-      .catch(function () {});
+    saveOverride();
   });
+
+  async function saveOverride() {
+    const override = meUrlOverride.value.trim();
+    if (override && !isHttpUrl(override)) {
+      Dashboard.alert({ message: "The Jellystics URL override must be an absolute http or https URL.", title: "Error" });
+      return;
+    }
+    Dashboard.showLoadingMsg();
+    try {
+      // Changes only the override server side, then checks the health endpoint of the new address.
+      await ApiClient.fetch({
+        url: ApiClient.getUrl("Jellystics/LinkOverride"),
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ url: override }),
+        dataType: "json",
+      });
+      await loadInfo();
+    } catch (error) {
+      Dashboard.alert({ message: await errorText(error, "Could not save the override."), title: "Error" });
+    } finally {
+      Dashboard.hideLoadingMsg();
+    }
+  }
 
   importButton.addEventListener("click", async function (e) {
     e.preventDefault();
